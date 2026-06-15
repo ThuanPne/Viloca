@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Link } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
   return (
@@ -36,7 +37,10 @@ export default function ProfileScreen() {
       </View>
 
       <View className="px-6 mt-6 mb-12">
-        <TouchableOpacity className="bg-red-50 py-4 rounded-2xl items-center">
+        <TouchableOpacity
+          className="bg-red-50 py-4 rounded-2xl items-center"
+          onPress={() => supabase.auth.signOut()}
+        >
           <Text className="text-red-500 font-medium">Đăng xuất</Text>
         </TouchableOpacity>
       </View>

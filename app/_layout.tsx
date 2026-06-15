@@ -1,13 +1,14 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const setUser = useAuthStore((s) => s.setUser);
+  const segments = useSegments();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -15,7 +16,10 @@ export default function RootLayout() {
       if (!isReady) setIsReady(true);
       if (session?.user) {
         router.replace('/(app)');
-      } else {
+      } else if (
+        !segments.includes('verify-email' as never) &&
+        !segments.includes('onboarding' as never)
+      ) {
         router.replace('/(auth)/welcome');
       }
     });
@@ -31,5 +35,5 @@ export default function RootLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />p22;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
