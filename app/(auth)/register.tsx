@@ -60,6 +60,14 @@ const CONDITION_LABELS = [
   { key: 'hasSpecial' as const, label: 'Có ký tự đặc biệt (!@#...)' },
 ];
 
+function mapAuthError(message: string): string {
+  if (/rate limit/i.test(message)) return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
+  if (/already registered/i.test(message)) return 'Email này đã được đăng ký. Vui lòng đăng nhập.';
+  if (/invalid email/i.test(message)) return 'Địa chỉ email không hợp lệ.';
+  if (/password/i.test(message)) return 'Mật khẩu không đáp ứng yêu cầu bảo mật.';
+  return message; // TODO: map to Vietnamese before release
+}
+
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -91,15 +99,22 @@ export default function RegisterScreen() {
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      setError(mapAuthError(authError.message));
       return;
     }
 
-    if (data.user) {
-      setUser(data.user);
+    if (data.user && data.user.identities?.length === 0) {
+      // Email exists but unverified — resend OTP and let them verify
+      await supabase.auth.resend({ email, type: 'signup' });
+      router.replace({ pathname: '/(auth)/verify-email', params: { email } });
+      return;
+    }
+
+    if (data.session) {
+      setUser(data.session.user);
       router.replace('/(app)');
-    } else {
-      router.replace('/(auth)/login');
+    } else if (data.user) {
+      router.replace({ pathname: '/(auth)/verify-email', params: { email } });
     }
   }
 
