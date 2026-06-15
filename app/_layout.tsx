@@ -16,7 +16,10 @@ export default function RootLayout() {
       if (!isReady) setIsReady(true);
       if (session?.user) {
         router.replace('/(app)');
-      } else if (!segments.includes('verify-email' as never)) {
+      } else if (
+        !segments.includes('verify-email' as never) &&
+        !segments.includes('onboarding' as never)
+      ) {
         router.replace('/(auth)/welcome');
       }
     });

@@ -56,8 +56,9 @@ export default function VerifyEmailScreen() {
       setError(mapOtpError(verifyError.message));
       setOtp(Array(OTP_LENGTH).fill(''));
       refs.current[0]?.focus();
+    } else {
+      router.replace('/(app)');
     }
-    // on success: onAuthStateChange in _layout.tsx handles redirect to /(app)
   }
 
   function onChangeText(index: number, value: string) {

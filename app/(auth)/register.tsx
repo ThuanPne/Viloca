@@ -10,9 +10,8 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore } from '@/store/authStore';
 
 type PasswordConditions = {
   minLength: boolean;
@@ -69,18 +68,21 @@ function mapAuthError(message: string): string {
 }
 
 export default function RegisterScreen() {
-  const [name, setName] = useState('');
+  const { name, age_range } = useLocalSearchParams<{ name?: string; age_range?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const setUser = useAuthStore((s) => s.setUser);
+  const [submitted, setSubmitted] = useState(false);
 
   const conditions = getPasswordConditions(password);
   const strength = password.length > 0 ? getPasswordStrength(conditions) : 0;
   const allConditionsMet = Object.values(conditions).every(Boolean);
-  const isFormValid = name.trim().length > 0 && validateEmail(email) && allConditionsMet;
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+  const isFormValid = validateEmail(email) && allConditionsMet;
 
   function handleFieldChange(setter: (v: string) => void) {
     return (value: string) => {
@@ -90,11 +92,16 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
+    setSubmitted(true);
+    if (!passwordsMatch) {
+      return;
+    }
+
     setLoading(true);
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name.trim() } },
+      options: { data: { full_name: name ?? '', age_range: age_range ?? '' } },
     });
     setLoading(false);
 
@@ -104,14 +111,12 @@ export default function RegisterScreen() {
     }
 
     if (data.user && data.user.identities?.length === 0) {
-      // Email exists but unverified — resend OTP and let them verify
       await supabase.auth.resend({ email, type: 'signup' });
       router.replace({ pathname: '/(auth)/verify-email', params: { email } });
       return;
     }
 
     if (data.session) {
-      setUser(data.session.user);
       router.replace('/(app)');
     } else if (data.user) {
       router.replace({ pathname: '/(auth)/verify-email', params: { email } });
@@ -153,17 +158,6 @@ export default function RegisterScreen() {
           ) : null}
 
           <View className="gap-4 mb-6">
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1.5">Họ và tên</Text>
-              <TextInput
-                className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 bg-gray-50"
-                placeholder="Nguyễn Văn A"
-                placeholderTextColor="#9ca3af"
-                value={name}
-                onChangeText={handleFieldChange(setName)}
-              />
-            </View>
-
             <View>
               <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
               <TextInput
@@ -232,6 +226,31 @@ export default function RegisterScreen() {
                     </View>
                   ))}
                 </View>
+              )}
+            </View>
+
+            <View>
+              <Text className="text-sm font-medium text-gray-700 mb-1.5">Nhập lại mật khẩu</Text>
+              <View className="relative">
+                <TextInput
+                  className={`border rounded-xl px-4 py-3.5 text-gray-900 bg-gray-50 pr-14 ${
+                    submitted && !passwordsMatch ? 'border-red-300' : 'border-gray-200'
+                  }`}
+                  placeholder="Nhập lại mật khẩu"
+                  placeholderTextColor="#9ca3af"
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={handleFieldChange(setConfirmPassword)}
+                />
+                <TouchableOpacity
+                  className="absolute right-4 top-0 bottom-0 justify-center"
+                  onPress={() => setShowConfirmPassword((v) => !v)}
+                >
+                  <Text className="text-gray-400 text-sm">{showConfirmPassword ? 'Ẩn' : 'Hiện'}</Text>
+                </TouchableOpacity>
+              </View>
+              {submitted && !passwordsMatch && (
+                <Text className="text-xs text-red-400 mt-1">Mật khẩu không khớp</Text>
               )}
             </View>
           </View>
