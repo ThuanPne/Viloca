@@ -16,7 +16,8 @@ function mapOtpError(message: string): string {
   if (/rate limit/i.test(message)) return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
   if (/expired/i.test(message)) return 'Mã đã hết hạn. Vui lòng nhấn "Gửi lại mã".';
   if (/invalid/i.test(message)) return 'Mã không đúng. Vui lòng kiểm tra lại.';
-  return 'Xác nhận thất bại. Vui lòng thử lại.';
+  if (/sending confirmation email|confirmation email/i.test(message)) return 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.';
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
 const OTP_LENGTH = 6;
@@ -97,8 +98,12 @@ export default function VerifyEmailScreen() {
 
   async function handleResend() {
     setError('');
-    await supabase.auth.resend({ email: email ?? '', type: 'signup' });
-    setCountdown(60);
+    const { error: resendError } = await supabase.auth.resend({ email: email ?? '', type: 'signup' });
+    if (resendError) {
+      setError(mapOtpError(resendError.message));
+    } else {
+      setCountdown(60);
+    }
   }
 
   const isFilled = otp.every((d) => d !== '');

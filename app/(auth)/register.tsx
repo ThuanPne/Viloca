@@ -64,7 +64,8 @@ function mapAuthError(message: string): string {
   if (/already registered/i.test(message)) return 'Email này đã được đăng ký. Vui lòng đăng nhập.';
   if (/invalid email/i.test(message)) return 'Địa chỉ email không hợp lệ.';
   if (/password/i.test(message)) return 'Mật khẩu không đáp ứng yêu cầu bảo mật.';
-  return message; // TODO: map to Vietnamese before release
+  if (/sending confirmation email|confirmation email/i.test(message)) return 'Không thể gửi email xác nhận. Vui lòng kiểm tra lại địa chỉ email.';
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
 export default function RegisterScreen() {
@@ -106,6 +107,12 @@ export default function RegisterScreen() {
     setLoading(false);
 
     if (authError) {
+      // User was created but email sending failed — profile already inserted via trigger.
+      // Navigate to verify-email so they can resend when ready.
+      if (/sending confirmation email|confirmation email/i.test(authError.message) && data?.user) {
+        router.replace({ pathname: '/(auth)/verify-email', params: { email } });
+        return;
+      }
       setError(mapAuthError(authError.message));
       return;
     }
