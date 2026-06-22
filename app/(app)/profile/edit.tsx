@@ -1,60 +1,96 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import { Link } from 'expo-router';
+import { useState } from 'react';
+import {
+  View, Text, StyleSheet, TextInput,
+  TouchableOpacity, ScrollView, ActivityIndicator,
+} from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/authStore';
+import { Avatar } from '@/src/components/ui/Avatar';
+import { colors } from '@/src/theme/colors';
+import { spacing, radius } from '@/src/theme/spacing';
+import supabase from '@/src/lib/supabase';
 
 export default function EditProfileScreen() {
+  const user = useAuthStore((s) => s.user);
+  const [fullName, setFullName] = useState(user?.user_metadata?.full_name ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave() {
+    if (!fullName.trim()) { setError('Vui lòng nhập họ tên'); return; }
+    setSaving(true);
+    setError('');
+    const { error: err } = await supabase.auth.updateUser({ data: { full_name: fullName.trim() } });
+    setSaving(false);
+    if (err) { setError(err.message); return; }
+    router.back();
+  }
+
   return (
-    <ScrollView className="flex-1 bg-white" contentContainerClassName="px-6 pt-16 pb-12">
-      <View className="flex-row items-center mb-8">
-        <Link href="/(app)/profile" asChild>
-          <TouchableOpacity>
-            <Text className="text-2xl">←</Text>
-          </TouchableOpacity>
-        </Link>
-        <Text className="text-xl font-bold text-gray-900 ml-4">Chỉnh sửa hồ sơ</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.heading}>Chỉnh sửa hồ sơ</Text>
+        <View style={{ width: 38 }} />
       </View>
 
-      <View className="items-center mb-8">
-        <View className="w-24 h-24 bg-blue-100 rounded-full items-center justify-center">
-          <Text className="text-4xl">👤</Text>
-        </View>
-        <TouchableOpacity className="mt-2">
-          <Text className="text-blue-500 font-medium">Đổi ảnh</Text>
+      {/* Avatar */}
+      <View style={styles.avatarSection}>
+        <Avatar name={fullName || user?.user_metadata?.full_name} size={80} />
+        <TouchableOpacity style={styles.changePhotoBtn}>
+          <Text style={styles.changePhotoText}>Đổi ảnh</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="gap-4 mb-8">
-        <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Họ và tên</Text>
-          <TextInput
-            className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900"
-            defaultValue="Nguyễn Văn A"
-          />
-        </View>
+      {/* Fields */}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
-          <TextInput
-            className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-400 bg-gray-50"
-            defaultValue="email@example.com"
-            editable={false}
-          />
-          <Text className="text-xs text-gray-400 mt-1">Email không thể thay đổi</Text>
-        </View>
+      <Text style={styles.label}>Họ và tên</Text>
+      <TextInput
+        style={styles.input}
+        value={fullName}
+        onChangeText={setFullName}
+        placeholder="Họ và tên"
+        placeholderTextColor={colors.textMuted}
+      />
 
-        <View>
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Số điện thoại</Text>
-          <TextInput
-            className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900"
-            placeholder="0912 345 678"
-            placeholderTextColor="#9ca3af"
-            keyboardType="phone-pad"
-          />
-        </View>
-      </View>
+      <Text style={styles.label}>Email</Text>
+      <TextInput
+        style={[styles.input, styles.inputDisabled]}
+        value={user?.email ?? ''}
+        editable={false}
+      />
+      <Text style={styles.hint}>Email không thể thay đổi</Text>
 
-      <TouchableOpacity className="bg-blue-500 py-4 rounded-2xl items-center">
-        <Text className="text-white font-semibold text-base">Lưu thay đổi</Text>
+      {/* Save */}
+      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+        {saving
+          ? <ActivityIndicator color={colors.textOnDark} />
+          : <Text style={styles.saveText}>Lưu thay đổi</Text>
+        }
       </TouchableOpacity>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container:       { flex: 1, backgroundColor: colors.bgScreen },
+  content:         { paddingBottom: 48 },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingTop: spacing.xl },
+  backBtn:         { width: 38, height: 38, borderRadius: radius.lg, backgroundColor: colors.bgCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  heading:         { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  avatarSection:   { alignItems: 'center', paddingVertical: spacing.lg },
+  changePhotoBtn:  { marginTop: 8 },
+  changePhotoText: { fontSize: 13, fontWeight: '500', color: colors.primary600 },
+  label:           { fontSize: 13, fontWeight: '500', color: colors.textMuted, marginHorizontal: spacing.lg, marginBottom: 6, marginTop: spacing.md },
+  input:           { marginHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgCard },
+  inputDisabled:   { backgroundColor: colors.bgScreen, color: colors.textMuted },
+  hint:            { fontSize: 11, color: colors.textMuted, marginHorizontal: spacing.lg, marginTop: 4 },
+  error:           { color: colors.error, fontSize: 13, textAlign: 'center', marginBottom: spacing.md },
+  saveBtn:         { backgroundColor: colors.primary600, marginHorizontal: spacing.lg, marginTop: spacing.xl, paddingVertical: 16, borderRadius: radius.xl, alignItems: 'center' },
+  saveText:        { color: colors.textOnDark, fontWeight: '600', fontSize: 16 },
+});

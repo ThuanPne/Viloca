@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.thuanpne.viloca"
+      "statusBarHidden": false
     },
     "android": {
       "package": "com.thuanpne.viloca",
@@ -21,9 +21,12 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#FAF7F2",
+      "translucent": true
     },
+    "platforms": ["ios", "android"],
     "plugins": [
       "expo-router",
       "expo-status-bar"

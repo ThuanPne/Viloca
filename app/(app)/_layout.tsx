@@ -1,22 +1,38 @@
-import { useEffect } from 'react';
-import { Tabs, router } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/src/theme/colors';
 
 export default function AppLayout() {
-  const user = useAuthStore((s) => s.user);
-
-  useEffect(() => {
-    if (!user) {
-      router.replace('/(auth)/welcome');
-    }
-  }, [user]);
-
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" options={{ title: 'Trang chủ', tabBarIcon: () => null }} />
-      <Tabs.Screen name="explore" options={{ title: 'Khám phá', tabBarIcon: () => null }} />
-      <Tabs.Screen name="trips" options={{ title: 'Chuyến đi', tabBarIcon: () => null }} />
-      <Tabs.Screen name="profile/index" options={{ title: 'Hồ sơ', tabBarIcon: () => null }} />
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary600,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: { backgroundColor: colors.bgCard, borderTopColor: colors.border },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Khám phá',
+          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="workspace"
+        options={{
+          title: 'Trip',
+          tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Hồ sơ',
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
