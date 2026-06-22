@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
   const setUser = useAuthStore((s) => s.setUser);
+  const segments = useSegments();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
