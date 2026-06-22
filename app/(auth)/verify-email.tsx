@@ -16,18 +16,20 @@ function mapOtpError(message: string): string {
   if (/rate limit/i.test(message)) return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
   if (/expired/i.test(message)) return 'Mã đã hết hạn. Vui lòng nhấn "Gửi lại mã".';
   if (/invalid/i.test(message)) return 'Mã không đúng. Vui lòng kiểm tra lại.';
-  return 'Xác nhận thất bại. Vui lòng thử lại.';
+  if (/sending confirmation email|confirmation email/i.test(message)) return 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.';
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
 const OTP_LENGTH = 6;
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams<{ email: string }>();
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const { email, emailPending } = useLocalSearchParams<{ email: string; emailPending?: string }>();
+  const pending = emailPending === 'true';
+  const [otpValue, setOtpValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [countdown, setCountdown] = useState(60);
-  const refs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
+  const [countdown, setCountdown] = useState(pending ? 0 : 60);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (countdown === 0) return;
@@ -35,14 +37,7 @@ export default function VerifyEmailScreen() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  function updateOtp(index: number, value: string): string[] {
-    const next = [...otp];
-    next[index] = value;
-    return next;
-  }
-
-  async function handleVerify(digits: string[]) {
-    const token = digits.join('');
+  async function handleVerify(token: string) {
     if (token.length < OTP_LENGTH) return;
     setLoading(true);
     setError('');
@@ -54,54 +49,32 @@ export default function VerifyEmailScreen() {
     setLoading(false);
     if (verifyError) {
       setError(mapOtpError(verifyError.message));
-      setOtp(Array(OTP_LENGTH).fill(''));
-      refs.current[0]?.focus();
+      setOtpValue('');
     } else {
       router.replace('/(app)');
     }
   }
 
-  function onChangeText(index: number, value: string) {
+  function handleChangeText(value: string) {
     setError('');
-
-    // handle paste of 6 digits
-    const digits = value.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
+    setOtpValue(digits);
     if (digits.length === OTP_LENGTH) {
-      const pasted = digits.split('');
-      setOtp(pasted);
-      refs.current[OTP_LENGTH - 1]?.focus();
-      handleVerify(pasted);
-      return;
-    }
-
-    const digit = digits.slice(-1);
-    const next = updateOtp(index, digit);
-    setOtp(next);
-
-    if (digit && index < OTP_LENGTH - 1) {
-      refs.current[index + 1]?.focus();
-    }
-
-    if (digit && index === OTP_LENGTH - 1) {
-      handleVerify(next);
-    }
-  }
-
-  function onKeyPress(index: number, key: string) {
-    if (key === 'Backspace' && otp[index] === '' && index > 0) {
-      const next = updateOtp(index - 1, '');
-      setOtp(next);
-      refs.current[index - 1]?.focus();
+      handleVerify(digits);
     }
   }
 
   async function handleResend() {
     setError('');
-    await supabase.auth.resend({ email: email ?? '', type: 'signup' });
-    setCountdown(60);
+    const { error: resendError } = await supabase.auth.resend({ email: email ?? '', type: 'signup' });
+    if (resendError) {
+      setError(mapOtpError(resendError.message));
+    } else {
+      setCountdown(60);
+    }
   }
 
-  const isFilled = otp.every((d) => d !== '');
+  const digits = otpValue.split('');
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -128,23 +101,50 @@ export default function VerifyEmailScreen() {
             <Text className="text-blue-500 text-sm font-medium mt-0.5">{email}</Text>
           </View>
 
-          <View className="flex-row justify-center gap-3 mb-6">
-            {otp.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(r) => { refs.current[index] = r; }}
-                className={`w-12 h-14 border-2 rounded-xl text-center text-xl font-bold text-gray-900 ${
-                  digit ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
-                }`}
-                maxLength={OTP_LENGTH}
-                keyboardType="number-pad"
-                value={digit}
-                onChangeText={(v) => onChangeText(index, v)}
-                onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)}
-                selectTextOnFocus
-              />
-            ))}
-          </View>
+          {pending ? (
+            <View className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-5">
+              <Text className="text-yellow-700 text-sm text-center">
+                Email có thể chưa đến. Nhấn "Gửi lại mã" để thử lại.
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Hidden input captures all typing/backspace natively */}
+          <TextInput
+            ref={inputRef}
+            value={otpValue}
+            onChangeText={handleChangeText}
+            maxLength={OTP_LENGTH}
+            keyboardType="number-pad"
+            autoFocus
+            style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+          />
+
+          {/* Visual OTP boxes — tap to focus hidden input */}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => inputRef.current?.focus()}
+          >
+            <View className="flex-row justify-center gap-3 mb-6">
+              {Array.from({ length: OTP_LENGTH }).map((_, index) => {
+                const filled = digits[index] !== undefined;
+                const active = index === digits.length;
+                return (
+                  <View
+                    key={index}
+                    className={`w-12 h-14 border-2 rounded-xl items-center justify-center ${
+                      active ? 'border-blue-500 bg-blue-50' :
+                      filled ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <Text className="text-xl font-bold text-gray-900">
+                      {digits[index] ?? ''}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
 
           {error ? (
             <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5">
@@ -154,10 +154,10 @@ export default function VerifyEmailScreen() {
 
           <TouchableOpacity
             className={`py-4 rounded-2xl items-center mb-6 ${
-              isFilled && !loading ? 'bg-blue-500' : 'bg-blue-200'
+              otpValue.length === OTP_LENGTH && !loading ? 'bg-blue-500' : 'bg-blue-200'
             }`}
-            onPress={() => handleVerify(otp)}
-            disabled={!isFilled || loading}
+            onPress={() => handleVerify(otpValue)}
+            disabled={otpValue.length < OTP_LENGTH || loading}
             activeOpacity={0.8}
           >
             {loading ? (

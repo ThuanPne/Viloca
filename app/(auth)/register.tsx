@@ -61,10 +61,11 @@ const CONDITION_LABELS = [
 
 function mapAuthError(message: string): string {
   if (/rate limit/i.test(message)) return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
-  if (/already registered/i.test(message)) return 'Email này đã được đăng ký. Vui lòng đăng nhập.';
+  if (/already registered/i.test(message)) return 'Email này đã được đăng ký. Vui lòng dùng email khác hoặc đăng nhập.';
   if (/invalid email/i.test(message)) return 'Địa chỉ email không hợp lệ.';
   if (/password/i.test(message)) return 'Mật khẩu không đáp ứng yêu cầu bảo mật.';
-  return message; // TODO: map to Vietnamese before release
+  if (/sending confirmation email|confirmation email/i.test(message)) return 'Email không tồn tại. Vui lòng kiểm tra lại.';
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
 export default function RegisterScreen() {
@@ -76,6 +77,7 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const conditions = getPasswordConditions(password);
@@ -84,9 +86,10 @@ export default function RegisterScreen() {
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
   const isFormValid = validateEmail(email) && allConditionsMet;
 
-  function handleFieldChange(setter: (v: string) => void) {
+  function handleFieldChange(setter: (v: string) => void, clearEmailError = false) {
     return (value: string) => {
       setError('');
+      if (clearEmailError) setEmailError('');
       setter(value);
     };
   }
@@ -97,6 +100,7 @@ export default function RegisterScreen() {
       return;
     }
 
+    setEmailError('');
     setLoading(true);
     const { data, error: authError } = await supabase.auth.signUp({
       email,
@@ -106,13 +110,21 @@ export default function RegisterScreen() {
     setLoading(false);
 
     if (authError) {
+      if (/sending confirmation email|confirmation email/i.test(authError.message)) {
+        router.replace({ pathname: '/(auth)/verify-email', params: { email, emailPending: 'true' } });
+        return;
+      }
+      if (/already registered/i.test(authError.message)) {
+        setEmailError('Email này đã được đăng ký. Vui lòng dùng email khác hoặc đăng nhập.');
+        return;
+      }
       setError(mapAuthError(authError.message));
       return;
     }
 
+    // identities.length === 0 means email already registered (unconfirmed account)
     if (data.user && data.user.identities?.length === 0) {
-      await supabase.auth.resend({ email, type: 'signup' });
-      router.replace({ pathname: '/(auth)/verify-email', params: { email } });
+      setEmailError('Email này đã được đăng ký. Vui lòng dùng email khác hoặc đăng nhập.');
       return;
     }
 
@@ -161,15 +173,20 @@ export default function RegisterScreen() {
             <View>
               <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
               <TextInput
-                className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 bg-gray-50"
+                className={`border rounded-xl px-4 py-3.5 text-gray-900 bg-gray-50 ${
+                  emailError ? 'border-red-300' : 'border-gray-200'
+                }`}
                 placeholder="email@example.com"
                 placeholderTextColor="#9ca3af"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={email}
-                onChangeText={handleFieldChange(setEmail)}
+                onChangeText={handleFieldChange(setEmail, true)}
               />
+              {emailError ? (
+                <Text className="text-xs text-red-400 mt-1">{emailError}</Text>
+              ) : null}
             </View>
 
             <View>
