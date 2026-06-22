@@ -1,11 +1,13 @@
 import '../global.css';
-import { useEffect } from 'react';
-import { Stack, router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
+  const [isReady, setIsReady] = useState(false);
   const setUser = useAuthStore((s) => s.setUser);
   const segments = useSegments();
 
@@ -13,19 +15,29 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
 
+      if (!isReady) setIsReady(true);
+
       if (event === 'INITIAL_SESSION') {
-        // First load — go to app if logged in, else onboarding
-        router.replace(session?.user ? '/(app)' : '/(auth)/onboarding');
+        router.replace(session?.user ? '/(app)' : '/(auth)/login');
       } else if (event === 'SIGNED_IN') {
         router.replace('/(app)');
       } else if (event === 'SIGNED_OUT') {
-        router.replace('/(auth)/onboarding');
+        if (!segments.includes('verify-email' as never)) {
+          router.replace('/(auth)/login');
+        }
       }
-      // TOKEN_REFRESHED and others: just update store, don't navigate
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
 
   return (
     <>

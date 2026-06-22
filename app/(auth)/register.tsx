@@ -10,7 +10,7 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
 type PasswordConditions = {
@@ -69,7 +69,7 @@ function mapAuthError(message: string): string {
 }
 
 export default function RegisterScreen() {
-  const { name, age_range } = useLocalSearchParams<{ name?: string; age_range?: string }>();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -84,7 +84,7 @@ export default function RegisterScreen() {
   const strength = password.length > 0 ? getPasswordStrength(conditions) : 0;
   const allConditionsMet = Object.values(conditions).every(Boolean);
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
-  const isFormValid = validateEmail(email) && allConditionsMet;
+  const isFormValid = name.trim().length > 0 && validateEmail(email) && allConditionsMet && passwordsMatch;
 
   function handleFieldChange(setter: (v: string) => void, clearEmailError = false) {
     return (value: string) => {
@@ -105,7 +105,7 @@ export default function RegisterScreen() {
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name ?? '', age_range: age_range ?? '' } },
+      options: { data: { full_name: name.trim() } },
     });
     setLoading(false);
 
@@ -148,7 +148,7 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="pt-4 pb-8">
-            <Link href="/(auth)/welcome" asChild>
+            <Link href="/(auth)/login" asChild>
               <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-gray-100">
                 <Text className="text-gray-600 text-lg">←</Text>
               </TouchableOpacity>
@@ -170,6 +170,19 @@ export default function RegisterScreen() {
           ) : null}
 
           <View className="gap-4 mb-6">
+            <View>
+              <Text className="text-sm font-medium text-gray-700 mb-1.5">Họ và tên</Text>
+              <TextInput
+                className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 bg-gray-50"
+                placeholder="Nguyễn Văn A"
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="words"
+                autoCorrect={false}
+                value={name}
+                onChangeText={handleFieldChange(setName)}
+              />
+            </View>
+
             <View>
               <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
               <TextInput

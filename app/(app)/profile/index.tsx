@@ -51,7 +51,7 @@ export default function ProfileScreen() {
 
   async function handleSignOut() {
     await signOut();
-    router.replace('/(auth)/onboarding');
+    router.replace('/(auth)/login');
   }
 
   return (

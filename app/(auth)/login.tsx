@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { Link, router } from 'expo-router';
-import { Ionicons, AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, AntDesign } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 
@@ -244,56 +244,25 @@ export default function LoginScreen() {
             </View>
 
             {/* Social Buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
-              {/* Google */}
+            <View style={{ marginBottom: 28 }}>
               <TouchableOpacity
                 style={{
-                  flex: 1,
                   borderWidth: 1.5,
                   borderColor: '#e0e3e8',
                   borderRadius: 16,
                   paddingVertical: 14,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 10,
                   backgroundColor: '#ffffff',
                 }}
                 activeOpacity={0.7}
               >
                 <AntDesign name="google" size={22} color="#4285F4" />
-              </TouchableOpacity>
-
-              {/* Microsoft / Other */}
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderWidth: 1.5,
-                  borderColor: '#e0e3e8',
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#ffffff',
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="grid-outline" size={22} color="#181c20" />
-              </TouchableOpacity>
-
-              {/* Face ID / Biometric */}
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderWidth: 1.5,
-                  borderColor: '#e0e3e8',
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#ffffff',
-                }}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="face-recognition" size={22} color="#005d90" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#181c20' }}>
+                  Tiếp tục với Google
+                </Text>
               </TouchableOpacity>
             </View>
 
