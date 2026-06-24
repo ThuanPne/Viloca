@@ -51,6 +51,7 @@ export interface TripItem {
   experience_category: string | null;
   day_number: number;
   time_slot: TimeSlot;
+  visit_time: string | null; // "HH:MM"
   note: string | null;
   sort_order: number;
 }

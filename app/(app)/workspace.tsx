@@ -10,7 +10,6 @@ import { ScreenWrapper } from '@/src/components/ui/ScreenWrapper';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
-import { DatePicker } from '@/src/components/ui/DatePicker';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
 import supabase from '@/src/lib/supabase';
@@ -36,7 +35,7 @@ export default function WorkspaceScreen() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', destination: '', start_date: '', end_date: '' });
+  const [form, setForm] = useState({ title: '', destination: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -71,12 +70,12 @@ export default function WorkspaceScreen() {
     }
 
     const { data, error } = await supabase.from('trips').insert({
-      user_id:     session.user.id,
-      title:       form.title.trim(),
-      destination: form.destination.trim(),
-      start_date:  form.start_date || null,
-      end_date:    form.end_date   || null,
-      status:      'planning',
+      user_id:      session.user.id,
+      title:        form.title.trim(),
+      destination:  form.destination.trim(),
+      start_date:   null,
+      end_date:     null,
+      status:       'planning',
       summary_note: null,
       cover_image:  null,
     }).select().single();
@@ -95,7 +94,7 @@ export default function WorkspaceScreen() {
   }
 
   function resetForm() {
-    setForm({ title: '', destination: '', start_date: '', end_date: '' });
+    setForm({ title: '', destination: '' });
     setCreateError('');
   }
 
@@ -120,10 +119,16 @@ export default function WorkspaceScreen() {
           <Text style={styles.heading}>Trip Workspace</Text>
           <Text style={styles.subheading}>{trips.length} chuyến đi của bạn</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openModal}>
-          <Ionicons name="add" size={20} color={colors.textOnDark} />
-          <Text style={styles.addText}>Trip mới</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.aiBtn} onPress={() => alert('Tính năng AI đang được phát triển. Thử lại sau!')}>
+            <Ionicons name="sparkles-outline" size={16} color={colors.primary600} />
+            <Text style={styles.aiText}>AI Plan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={openModal}>
+            <Ionicons name="add" size={20} color={colors.textOnDark} />
+            <Text style={styles.addText}>Trip mới</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {trips.length === 0 ? (
@@ -202,24 +207,9 @@ export default function WorkspaceScreen() {
               onChangeText={(v) => setForm({ ...form, destination: v })}
             />
 
-            <View style={styles.dateRow}>
-              <View style={styles.dateCol}>
-                <Text style={styles.inputLabel}>Ngày đi</Text>
-                <DatePicker
-                  value={form.start_date}
-                  onChange={(v) => setForm({ ...form, start_date: v, end_date: form.end_date && form.end_date < v ? '' : form.end_date })}
-                  placeholder="Chọn ngày"
-                />
-              </View>
-              <View style={styles.dateCol}>
-                <Text style={styles.inputLabel}>Ngày về</Text>
-                <DatePicker
-                  value={form.end_date}
-                  onChange={(v) => setForm({ ...form, end_date: v })}
-                  placeholder="Chọn ngày"
-                  minDate={form.start_date ? new Date(form.start_date) : undefined}
-                />
-              </View>
+            <View style={styles.dateHint}>
+              <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.dateHintText}>Ngày đi có thể thêm sau trong trip</Text>
             </View>
 
             <View style={{ marginTop: spacing.lg }}>
@@ -240,11 +230,14 @@ function formatDate(iso: string) {
 
 const styles = StyleSheet.create({
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
-  heading:     { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  subheading:  { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  addBtn:      { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  addText:     { color: colors.textOnDark, fontWeight: '600', fontSize: 14 },
+  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
+  heading:       { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
+  subheading:    { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aiBtn:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  aiText:        { color: colors.primary600, fontWeight: '600', fontSize: 14 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  addText:       { color: colors.textOnDark, fontWeight: '600', fontSize: 14 },
   tripCard:    { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.bgCard, elevation: 2 },
   tripImage:   { width: '100%', height: 180, resizeMode: 'cover' },
   tripOverlay: { ...StyleSheet.absoluteFillObject as any, height: 180, backgroundColor: 'rgba(0,0,0,0.2)' },
@@ -260,8 +253,8 @@ const styles = StyleSheet.create({
   modalTitle:  { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
   errorBox:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
   errorText:   { flex: 1, color: colors.error, fontSize: 13 },
-  inputLabel:  { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: spacing.md },
-  input:       { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgScreen },
-  dateRow:     { flexDirection: 'row', gap: 12 },
-  dateCol:     { flex: 1 },
+  inputLabel:   { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: spacing.md },
+  input:        { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgScreen },
+  dateHint:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
+  dateHintText: { fontSize: 12, color: colors.textMuted },
 });
