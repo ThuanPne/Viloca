@@ -11,12 +11,12 @@ import { spacing, radius } from '@/src/theme/spacing';
 import supabase from '@/src/lib/supabase';
 
 const MENU_ITEMS = [
-  { icon: 'map-outline',           label: 'Chuyến đi của tôi',  value: null, route: '/(app)/workspace' },
-  { icon: 'heart-outline',         label: 'Địa điểm yêu thích', value: null, route: null },
-  { icon: 'star-outline',          label: 'Đánh giá của tôi',   value: null, route: null },
-  { icon: 'notifications-outline', label: 'Thông báo',           value: null, route: null },
-  { icon: 'shield-outline',        label: 'Quyền riêng tư',     value: null, route: null },
-  { icon: 'help-circle-outline',   label: 'Trợ giúp',           value: null, route: null },
+  { icon: 'map-outline',           label: 'Chuyến đi của tôi',  route: '/(app)/workspace' },
+  { icon: 'heart-outline',         label: 'Địa điểm yêu thích', route: null },
+  { icon: 'star-outline',          label: 'Đánh giá của tôi',   route: null },
+  { icon: 'notifications-outline', label: 'Thông báo',           route: null },
+  { icon: 'shield-outline',        label: 'Quyền riêng tư',     route: null },
+  { icon: 'help-circle-outline',   label: 'Trợ giúp',           route: null },
 ];
 
 export default function ProfileScreen() {
@@ -33,11 +33,9 @@ export default function ProfileScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const uid = session.user.id;
-      // Count trips
       const { count: tCount } = await supabase
         .from('trips').select('id', { count: 'exact', head: true }).eq('user_id', uid);
       setTripCount(tCount ?? 0);
-      // Count trip_items owned by this user (via trip ownership)
       const { data: userTrips } = await supabase.from('trips').select('id').eq('user_id', uid);
       if (userTrips && userTrips.length > 0) {
         const tripIds = userTrips.map((t: { id: string }) => t.id);
@@ -99,10 +97,7 @@ export default function ProfileScreen() {
                 </View>
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </View>
-              <View style={styles.menuRight}>
-                {item.value && <Text style={styles.menuValue}>{item.value}</Text>}
-                <Ionicons name="chevron-forward" size={16} color={colors.border} />
-              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.border} />
             </TouchableOpacity>
           ))}
         </View>
@@ -135,8 +130,6 @@ const styles = StyleSheet.create({
   menuLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
   menuIcon:      { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
   menuLabel:     { fontSize: 14, color: colors.textPrimary },
-  menuRight:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  menuValue:     { fontSize: 12, color: colors.textMuted },
   signOutSection:{ margin: spacing.lg },
   signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 14, borderRadius: radius.lg },
   signOutText:   { fontSize: 15, fontWeight: '600', color: colors.error },
