@@ -15,24 +15,40 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Trang chủ',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
           title: 'Khám phá',
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="workspace"
         options={{
-          title: 'Trip',
-          tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" size={size} color={color} />,
+          title: 'Chuyến đi',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Hồ sơ',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          ),
         }}
       />
+      <Tabs.Screen name="profile/edit" options={{ href: null }} />
     </Tabs>
   );
 }

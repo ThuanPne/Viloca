@@ -12,8 +12,9 @@ import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import supabase from '@/src/lib/supabase';
 import type { Trip, TripItem, TripJournal, TimeSlot } from '@/src/types';
+import { usePackingList } from '@/src/hooks/usePackingList';
 
-type Tab = 'timeline' | 'journal' | 'info';
+type Tab = 'timeline' | 'journal' | 'info' | 'packing';
 
 const STATUS_COLOR: Record<string, 'warning' | 'forest' | 'neutral'> = {
   planning: 'warning', active: 'forest', completed: 'neutral',
@@ -50,6 +51,10 @@ export default function TripDetailScreen() {
   const [journals, setJournals]   = useState<TripJournal[]>([]);
   const [tab, setTab]             = useState<Tab>('timeline');
   const [loading, setLoading]     = useState(true);
+
+  const { items: packingItems, addItem, togglePacked, deleteItem, addTemplate, progress } = usePackingList(id);
+  const [newPackingItem, setNewPackingItem] = useState('');
+  const [templatesUsed, setTemplatesUsed] = useState(false);
 
   // Journal form
   const [journalDay, setJournalDay]         = useState(1);
@@ -203,8 +208,8 @@ export default function TripDetailScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {(['timeline', 'journal', 'info'] as Tab[]).map((t) => {
-          const labels: Record<Tab, string> = { timeline: 'Timeline', journal: 'Nhật ký', info: 'Thông tin' };
+        {(['timeline', 'journal', 'info', 'packing'] as Tab[]).map((t) => {
+          const labels: Record<Tab, string> = { timeline: 'Timeline', journal: 'Nhật ký', info: 'Thông tin', packing: 'Hành lý' };
           return (
             <TouchableOpacity
               key={t}
@@ -354,6 +359,107 @@ export default function TripDetailScreen() {
             </View>
           )}
         </ScrollView>
+      )}
+
+      {/* ── Packing List ── */}
+      {tab === 'packing' && (
+        <View style={{ flex: 1 }}>
+          {/* Progress header */}
+          <View style={styles.packingProgress}>
+            <View style={styles.packingProgressRow}>
+              <Text style={styles.packingProgressLabel}>
+                🎒 {progress.packed}/{progress.total} vật dụng
+              </Text>
+              <Text style={styles.packingPercent}>{progress.percent}%</Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progress.percent}%` as any }]} />
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
+            {/* Template chips — shown only until first use */}
+            {!templatesUsed && (
+              <View style={styles.templateSection}>
+                <Text style={styles.templateLabel}>Gợi ý nhanh</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {([
+                    { key: 'beach', label: '🏖 Biển' },
+                    { key: 'mountain', label: '⛰ Núi' },
+                    { key: 'international', label: '✈️ Quốc tế' },
+                    { key: 'business', label: '💼 Công tác' },
+                  ] as { key: any; label: string }[]).map(({ key, label }) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={styles.templateChip}
+                      onPress={async () => {
+                        await addTemplate(key);
+                        setTemplatesUsed(true);
+                      }}
+                    >
+                      <Text style={styles.templateChipText}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Checklist */}
+            {packingItems.length === 0 && templatesUsed === false ? (
+              <View style={styles.packingEmpty}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>🎒</Text>
+                <Text style={styles.emptyTitle}>Chưa có vật dụng nào</Text>
+                <Text style={styles.emptyBody}>Chọn template bên trên hoặc thêm thủ công bên dưới</Text>
+              </View>
+            ) : (
+              packingItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.packingItem}
+                  activeOpacity={0.7}
+                  onPress={() => togglePacked(item.id)}
+                >
+                  <View style={[styles.checkbox, item.is_packed && styles.checkboxChecked]}>
+                    {item.is_packed && <Ionicons name="checkmark" size={12} color="#fff" />}
+                  </View>
+                  <Text style={[styles.packingItemText, item.is_packed && styles.packingItemTextDone]}>
+                    {item.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.packingDeleteBtn}>
+                    <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))
+            )}
+
+            {/* Add item input */}
+            <View style={styles.packingAddRow}>
+              <TextInput
+                style={styles.packingInput}
+                placeholder="Thêm vật dụng..."
+                placeholderTextColor={colors.textMuted}
+                value={newPackingItem}
+                onChangeText={setNewPackingItem}
+                returnKeyType="done"
+                onSubmitEditing={async () => {
+                  if (!newPackingItem.trim()) return;
+                  await addItem(newPackingItem.trim());
+                  setNewPackingItem('');
+                }}
+              />
+              <TouchableOpacity
+                style={styles.packingAddBtn}
+                onPress={async () => {
+                  if (!newPackingItem.trim()) return;
+                  await addItem(newPackingItem.trim());
+                  setNewPackingItem('');
+                }}
+              >
+                <Ionicons name="add" size={20} color={colors.textOnDark} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       )}
 
       {/* ── Add Experience Modal ── */}
@@ -530,6 +636,27 @@ const styles = StyleSheet.create({
   infoRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel:          { fontSize: 13, color: colors.textMuted },
   infoValue:          { fontSize: 13, fontWeight: '500', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
+  // Packing List
+  packingProgress:      { backgroundColor: colors.bgCard, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  packingProgressRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  packingProgressLabel: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  packingPercent:       { fontSize: 13, fontWeight: '700', color: colors.primary600 },
+  progressTrack:        { height: 6, borderRadius: 3, backgroundColor: colors.border },
+  progressFill:         { height: 6, borderRadius: 3, backgroundColor: colors.primary600 },
+  templateSection:      { marginBottom: spacing.lg },
+  templateLabel:        { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  templateChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border },
+  templateChipText:     { fontSize: 13, color: colors.textPrimary, fontWeight: '500' },
+  packingEmpty:         { alignItems: 'center', paddingTop: 40, paddingBottom: 20 },
+  packingItem:          { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bgCard, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginBottom: 8 },
+  checkbox:             { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked:      { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+  packingItemText:      { flex: 1, fontSize: 14, color: colors.textPrimary },
+  packingItemTextDone:  { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+  packingDeleteBtn:     { padding: 4 },
+  packingAddRow:        { flexDirection: 'row', gap: 8, marginTop: spacing.md },
+  packingInput:         { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.bgCard },
+  packingAddBtn:        { width: 42, height: 42, borderRadius: radius.lg, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center' },
   // Modal
   modalOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet:         { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
