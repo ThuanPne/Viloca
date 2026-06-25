@@ -51,9 +51,28 @@ export interface TripItem {
   experience_category: string | null;
   day_number: number;
   time_slot: TimeSlot;
-  visit_time: string | null; // "HH:MM"
   note: string | null;
   sort_order: number;
+}
+
+export type BookmarkStatus = 'want' | 'planned' | 'done';
+
+export interface Bookmark {
+  id: string;
+  user_id: string;
+  experience_id: string;
+  status: BookmarkStatus;
+  created_at: string;
+}
+
+export interface PackingItem {
+  id: string;
+  trip_id: string;
+  name: string;
+  is_packed: boolean;
+  category: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface TripJournal {

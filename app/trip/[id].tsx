@@ -10,11 +10,11 @@ import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
-import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
 import type { Trip, TripItem, TripJournal, TimeSlot } from '@/src/types';
+import { usePackingList } from '@/src/hooks/usePackingList';
 
-type Tab = 'timeline' | 'journal' | 'info';
+type Tab = 'timeline' | 'journal' | 'info' | 'packing';
 
 const STATUS_COLOR: Record<string, 'warning' | 'forest' | 'neutral'> = {
   planning: 'warning', active: 'forest', completed: 'neutral',
@@ -33,18 +33,6 @@ const TIME_SLOTS: { value: TimeSlot; label: string; icon: string }[] = [
 const CATEGORY_LABEL: Record<string, string> = {
   food_tour: 'Ẩm thực', workshop: 'Workshop', trekking: 'Thiên nhiên', cultural: 'Văn hóa',
 };
-const SLOT_COLOR: Record<string, string> = {
-  morning:   '#F59E0B',
-  afternoon: '#3B82F6',
-  evening:   '#7C3AED',
-};
-
-function dayLabel(trip: Trip, dayNum: number): string {
-  if (!trip.start_date) return `Ngày ${dayNum}`;
-  const d = new Date(trip.start_date);
-  d.setDate(d.getDate() + dayNum - 1);
-  return `Ngày ${dayNum} · ${d.getDate()}/${d.getMonth() + 1}`;
-}
 
 function tripDayCount(trip: Trip): number {
   if (trip.start_date && trip.end_date) {
@@ -64,20 +52,14 @@ export default function TripDetailScreen() {
   const [tab, setTab]             = useState<Tab>('timeline');
   const [loading, setLoading]     = useState(true);
 
+  const { items: packingItems, addItem, togglePacked, deleteItem, addTemplate, progress } = usePackingList(id);
+  const [newPackingItem, setNewPackingItem] = useState('');
+  const [templatesUsed, setTemplatesUsed] = useState(false);
+
   // Journal form
   const [journalDay, setJournalDay]         = useState(1);
   const [journalContent, setJournalContent] = useState('');
   const [saving, setSaving]                 = useState(false);
-
-  // Date setup
-  const [showDateModal, setShowDateModal]   = useState(false);
-  const [setupStart, setSetupStart]         = useState('');
-  const [setupEnd, setSetupEnd]             = useState('');
-  const [savingDates, setSavingDates]       = useState(false);
-  const [dismissedAI, setDismissedAI]       = useState(false);
-
-  // Detail modal
-  const [selectedItem, setSelectedItem]     = useState<TripItem | null>(null);
 
   // Add experience modal
   const [showAddExp, setShowAddExp]         = useState(false);
@@ -85,7 +67,6 @@ export default function TripDetailScreen() {
   const [pickedExp, setPickedExp]           = useState<(typeof mockExperiences)[0] | null>(null);
   const [addDay, setAddDay]                 = useState(1);
   const [addSlot, setAddSlot]              = useState<TimeSlot>('morning');
-  const [addTime, setAddTime]              = useState('');
   const [addNote, setAddNote]              = useState('');
   const [adding, setAdding]                 = useState(false);
   const [addError, setAddError]             = useState('');
@@ -103,20 +84,6 @@ export default function TripDetailScreen() {
       setLoading(false);
     });
   }, [id]);
-
-  async function saveTripDates() {
-    if (!setupStart || !id) return;
-    setSavingDates(true);
-    const { data } = await supabase
-      .from('trips')
-      .update({ start_date: setupStart, end_date: setupEnd || null })
-      .eq('id', id)
-      .select()
-      .single();
-    setSavingDates(false);
-    if (data) setTrip(data);
-    setShowDateModal(false);
-  }
 
   async function saveJournal() {
     if (!id || !journalContent.trim()) return;
@@ -155,7 +122,6 @@ export default function TripDetailScreen() {
       experience_category:  pickedExp.category,
       day_number:           addDay,
       time_slot:            addSlot,
-      visit_time:           addTime || null,
       note:                 addNote.trim() || null,
       sort_order:           0,
     }).select().single();
@@ -170,7 +136,6 @@ export default function TripDetailScreen() {
     setExpSearch('');
     setAddDay(1);
     setAddSlot('morning');
-    setAddTime('');
     setAddNote('');
     setAddError('');
     setShowAddExp(true);
@@ -243,8 +208,8 @@ export default function TripDetailScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {(['timeline', 'journal', 'info'] as Tab[]).map((t) => {
-          const labels: Record<Tab, string> = { timeline: 'Timeline', journal: 'Nhật ký', info: 'Thông tin' };
+        {(['timeline', 'journal', 'info', 'packing'] as Tab[]).map((t) => {
+          const labels: Record<Tab, string> = { timeline: 'Timeline', journal: 'Nhật ký', info: 'Thông tin', packing: 'Hành lý' };
           return (
             <TouchableOpacity
               key={t}
@@ -261,151 +226,59 @@ export default function TripDetailScreen() {
       {tab === 'timeline' && (
         <View style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
-
-            {/* Setup card — hiện khi chưa có ngày đi */}
-            {!trip.start_date && (
-              <TouchableOpacity style={styles.setupCard} activeOpacity={0.85} onPress={() => { setSetupStart(''); setSetupEnd(''); setShowDateModal(true); }}>
-                <View style={styles.setupCardLeft}>
-                  <View style={styles.setupCardIcon}>
-                    <Ionicons name="calendar-outline" size={20} color={colors.primary600} />
-                  </View>
-                  <View>
-                    <Text style={styles.setupCardTitle}>Thêm ngày đi</Text>
-                    <Text style={styles.setupCardSub}>Để xem timeline theo từng ngày</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.primary600} />
-              </TouchableOpacity>
-            )}
-
-            {/* AI banner — hiện khi đã có ngày, chưa có địa điểm, chưa dismiss */}
-            {trip.start_date && items.length === 0 && !dismissedAI && (
-              <View style={styles.aiBanner}>
-                <View style={styles.aiBannerTop}>
-                  <View style={styles.aiBannerTitleRow}>
-                    <Ionicons name="sparkles-outline" size={16} color={colors.primary600} />
-                    <Text style={styles.aiBannerTitle}>AI gợi ý lịch trình cho bạn</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setDismissedAI(true)}>
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.aiBannerSub}>Chọn vibe chuyến đi để AI tạo gợi ý phù hợp</Text>
-                <View style={styles.vibesRow}>
-                  {['Bình yên', 'Cổ kính', 'Hoang sơ', 'Ẩm thực', 'Mạo hiểm', 'Văn hóa'].map((v) => (
-                    <View key={v} style={styles.vibeChip}>
-                      <Text style={styles.vibeChipText}>{v}</Text>
-                    </View>
-                  ))}
-                </View>
-                <TouchableOpacity style={styles.aiBannerBtn} onPress={() => alert('Tính năng AI đang được phát triển. Thử lại sau!')}>
-                  <Ionicons name="sparkles-outline" size={15} color={colors.textOnDark} />
-                  <Text style={styles.aiBannerBtnText}>Bắt đầu gợi ý</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             {items.length === 0 ? (
               /* Inline empty state — không dùng EmptyState component vì flex:1 collapse trong ScrollView */
               <View style={styles.emptyWrap}>
                 <Ionicons name="map-outline" size={64} color={colors.border} />
                 <Text style={styles.emptyTitle}>Chưa có địa điểm nào</Text>
-                <Text style={styles.emptyBody}>Tự thêm địa điểm hoặc để AI gợi ý lịch trình phù hợp với bạn</Text>
-                <TouchableOpacity style={styles.aiSuggestBtn} onPress={() => alert('Tính năng AI đang được phát triển. Thử lại sau!')}>
-                  <Ionicons name="sparkles-outline" size={18} color={colors.primary600} />
-                  <Text style={styles.aiSuggestText}>AI gợi ý lịch trình</Text>
-                </TouchableOpacity>
+                <Text style={styles.emptyBody}>Nhấn nút{' '}
+                  <Text style={{ color: colors.primary600, fontWeight: '700' }}>+</Text>
+                  {' '}ở góc dưới để thêm địa điểm vào lịch trình
+                </Text>
                 <TouchableOpacity style={styles.addInlineBtn} onPress={openAddExp}>
                   <Ionicons name="add-circle-outline" size={18} color={colors.textOnDark} />
-                  <Text style={styles.addInlineBtnText}>Tự thêm địa điểm</Text>
+                  <Text style={styles.addInlineBtnText}>Thêm địa điểm đầu tiên</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              Object.keys(itemsByDay).map((dayNum) => {
-                const dayItems = itemsByDay[Number(dayNum)];
-                return (
-                  <View key={dayNum} style={styles.dayGroup}>
-                    {/* Day header */}
-                    <View style={styles.dayGroupHeader}>
-                      <View style={styles.dayPill}>
-                        <Text style={styles.dayPillText}>{dayLabel(trip, Number(dayNum))}</Text>
+              Object.keys(itemsByDay).map((dayNum) => (
+                <View key={dayNum} style={styles.dayGroup}>
+                  <Text style={styles.dayGroupTitle}>Ngày {dayNum}</Text>
+                  {itemsByDay[Number(dayNum)].map((item) => (
+                    <View key={item.id} style={styles.timelineItem}>
+                      <View style={styles.timelineDotWrap}>
+                        <View style={styles.timelineDot} />
                       </View>
-                      <TouchableOpacity
-                        style={styles.dayAddBtn}
-                        onPress={() => { setAddDay(Number(dayNum)); openAddExp(); }}
-                      >
-                        <Ionicons name="add" size={14} color={colors.primary600} />
-                        <Text style={styles.dayAddText}>Thêm</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Timeline items */}
-                    {dayItems.map((item, idx) => {
-                      const slot      = TIME_SLOTS.find(s => s.value === item.time_slot);
-                      const slotColor = SLOT_COLOR[item.time_slot] ?? colors.primary600;
-                      const isLast    = idx === dayItems.length - 1;
-                      return (
-                        <TouchableOpacity key={item.id} style={styles.timelineItem} activeOpacity={0.85} onPress={() => setSelectedItem(item)}>
-                          {/* Dot + line column */}
-                          <View style={styles.timelineDotWrap}>
-                            <View style={[styles.timelineDotRing, { borderColor: slotColor }]}>
-                              <View style={[styles.timelineDotInner, { backgroundColor: slotColor }]} />
-                            </View>
-                            {!isLast && <View style={[styles.timelineConnector, { backgroundColor: slotColor + '40' }]} />}
-                          </View>
-
-                          {/* Card */}
-                          <View style={[styles.timelineCard, { borderLeftColor: slotColor }]}>
-                            <View style={styles.timelineCardContent}>
-                              {/* Slot pill + category */}
-                              <View style={styles.timelineTopRow}>
-                                <View style={[styles.slotPill, { backgroundColor: slotColor + '18' }]}>
-                                  <Text style={[styles.slotPillText, { color: slotColor }]}>
-                                    {slot?.icon} {slot?.label}{item.visit_time ? ` · ${item.visit_time.slice(0, 5)}` : ''}
-                                  </Text>
-                                </View>
-                                {item.experience_category && (
-                                  <View style={styles.catBadge}>
-                                    <Text style={styles.catBadgeText}>{CATEGORY_LABEL[item.experience_category]}</Text>
-                                  </View>
-                                )}
-                              </View>
-
-                              {/* Title */}
-                              <Text style={styles.timelineExp} numberOfLines={2}>{item.experience_title ?? '—'}</Text>
-
-                              {/* Location */}
-                              {item.experience_location && (
-                                <View style={styles.timelineLocRow}>
-                                  <Ionicons name="location-outline" size={11} color={colors.textMuted} />
-                                  <Text style={styles.timelineLoc} numberOfLines={1}>{item.experience_location}</Text>
-                                </View>
-                              )}
-
-                              {/* Note */}
-                              {item.note && (
-                                <View style={styles.timelineNoteRow}>
-                                  <Ionicons name="chatbubble-outline" size={11} color={colors.textMuted} />
-                                  <Text style={styles.timelineNote} numberOfLines={1}>{item.note}</Text>
-                                </View>
-                              )}
-                            </View>
-
-                            {/* Thumbnail */}
-                            {item.experience_image ? (
-                              <Image source={{ uri: item.experience_image }} style={styles.timelineThumb} />
-                            ) : (
-                              <View style={styles.timelineThumbPlaceholder}>
-                                <Ionicons name="image-outline" size={22} color={colors.border} />
-                              </View>
+                      <View style={styles.timelineCard}>
+                        {item.experience_image && (
+                          <Image source={{ uri: item.experience_image }} style={styles.timelineImg} />
+                        )}
+                        <View style={styles.timelineInfo}>
+                          <View style={styles.timelineTopRow}>
+                            <Text style={styles.timelineSlot}>
+                              {TIME_SLOTS.find(s => s.value === item.time_slot)?.icon}{' '}
+                              {TIME_SLOTS.find(s => s.value === item.time_slot)?.label}
+                            </Text>
+                            {item.experience_category && (
+                              <Text style={styles.timelineCat}>{CATEGORY_LABEL[item.experience_category]}</Text>
                             )}
                           </View>
+                          <Text style={styles.timelineExp} numberOfLines={2}>
+                            {item.experience_title ?? '—'}
+                          </Text>
+                          {item.experience_location && (
+                            <Text style={styles.timelineLoc}>📍 {item.experience_location}</Text>
+                          )}
+                          {item.note && <Text style={styles.timelineNote}>💬 {item.note}</Text>}
+                        </View>
+                        <TouchableOpacity style={styles.deleteBtn} onPress={() => removeItem(item.id)}>
+                          <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
                         </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              })
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))
             )}
           </ScrollView>
 
@@ -488,108 +361,106 @@ export default function TripDetailScreen() {
         </ScrollView>
       )}
 
-      {/* ── Item Detail Modal ── */}
-      <Modal visible={!!selectedItem} animationType="slide" transparent onRequestClose={() => setSelectedItem(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
-            <View style={styles.modalHandle} />
-
-            {selectedItem && (() => {
-              const slot = TIME_SLOTS.find(s => s.value === selectedItem.time_slot);
-              return (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {/* Cover image */}
-                  {selectedItem.experience_image ? (
-                    <Image source={{ uri: selectedItem.experience_image }} style={styles.detailImg} />
-                  ) : (
-                    <View style={styles.detailImgPlaceholder}>
-                      <Ionicons name="image-outline" size={40} color={colors.border} />
-                    </View>
-                  )}
-
-                  <View style={styles.detailBody}>
-                    {/* Category badge */}
-                    {selectedItem.experience_category && (
-                      <View style={styles.detailCatBadge}>
-                        <Text style={styles.detailCatText}>{CATEGORY_LABEL[selectedItem.experience_category] ?? selectedItem.experience_category}</Text>
-                      </View>
-                    )}
-
-                    {/* Title */}
-                    <Text style={styles.detailTitle}>{selectedItem.experience_title ?? '—'}</Text>
-
-                    {/* Location */}
-                    {selectedItem.experience_location && (
-                      <View style={styles.detailRow}>
-                        <Ionicons name="location-outline" size={15} color={colors.textMuted} />
-                        <Text style={styles.detailRowText}>{selectedItem.experience_location}</Text>
-                      </View>
-                    )}
-
-                    {/* Day + time */}
-                    <View style={styles.detailRow}>
-                      <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
-                      <Text style={styles.detailRowText}>
-                        Ngày {selectedItem.day_number} · {slot?.icon} {slot?.label}
-                        {selectedItem.visit_time ? ` · ${selectedItem.visit_time.slice(0, 5)}` : ''}
-                      </Text>
-                    </View>
-
-                    {/* Note */}
-                    {selectedItem.note && (
-                      <View style={styles.detailNoteBox}>
-                        <Text style={styles.detailNoteLabel}>Ghi chú</Text>
-                        <Text style={styles.detailNoteText}>{selectedItem.note}</Text>
-                      </View>
-                    )}
-
-                    {/* Actions */}
-                    <View style={styles.detailActions}>
-                      <TouchableOpacity
-                        style={styles.detailDeleteBtn}
-                        onPress={() => { removeItem(selectedItem.id); setSelectedItem(null); }}
-                      >
-                        <Ionicons name="trash-outline" size={16} color={colors.error} />
-                        <Text style={styles.detailDeleteText}>Xoá khỏi lịch trình</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setSelectedItem(null)}>
-                        <Text style={styles.detailCloseBtnText}>Đóng</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </ScrollView>
-              );
-            })()}
+      {/* ── Packing List ── */}
+      {tab === 'packing' && (
+        <View style={{ flex: 1 }}>
+          {/* Progress header */}
+          <View style={styles.packingProgress}>
+            <View style={styles.packingProgressRow}>
+              <Text style={styles.packingProgressLabel}>
+                🎒 {progress.packed}/{progress.total} vật dụng
+              </Text>
+              <Text style={styles.packingPercent}>{progress.percent}%</Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progress.percent}%` as any }]} />
+            </View>
           </View>
-        </View>
-      </Modal>
 
-      {/* ── Date Setup Modal ── */}
-      <Modal visible={showDateModal} animationType="slide" transparent onRequestClose={() => setShowDateModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxHeight: '55%' }]}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Ngày đi & về</Text>
-              <TouchableOpacity onPress={() => setShowDateModal(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
+          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
+            {/* Template chips — shown only until first use */}
+            {!templatesUsed && (
+              <View style={styles.templateSection}>
+                <Text style={styles.templateLabel}>Gợi ý nhanh</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {([
+                    { key: 'beach', label: '🏖 Biển' },
+                    { key: 'mountain', label: '⛰ Núi' },
+                    { key: 'international', label: '✈️ Quốc tế' },
+                    { key: 'business', label: '💼 Công tác' },
+                  ] as { key: any; label: string }[]).map(({ key, label }) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={styles.templateChip}
+                      onPress={async () => {
+                        await addTemplate(key);
+                        setTemplatesUsed(true);
+                      }}
+                    >
+                      <Text style={styles.templateChipText}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Checklist */}
+            {packingItems.length === 0 && templatesUsed === false ? (
+              <View style={styles.packingEmpty}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>🎒</Text>
+                <Text style={styles.emptyTitle}>Chưa có vật dụng nào</Text>
+                <Text style={styles.emptyBody}>Chọn template bên trên hoặc thêm thủ công bên dưới</Text>
+              </View>
+            ) : (
+              packingItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.packingItem}
+                  activeOpacity={0.7}
+                  onPress={() => togglePacked(item.id)}
+                >
+                  <View style={[styles.checkbox, item.is_packed && styles.checkboxChecked]}>
+                    {item.is_packed && <Ionicons name="checkmark" size={12} color="#fff" />}
+                  </View>
+                  <Text style={[styles.packingItemText, item.is_packed && styles.packingItemTextDone]}>
+                    {item.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.packingDeleteBtn}>
+                    <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))
+            )}
+
+            {/* Add item input */}
+            <View style={styles.packingAddRow}>
+              <TextInput
+                style={styles.packingInput}
+                placeholder="Thêm vật dụng..."
+                placeholderTextColor={colors.textMuted}
+                value={newPackingItem}
+                onChangeText={setNewPackingItem}
+                returnKeyType="done"
+                onSubmitEditing={async () => {
+                  if (!newPackingItem.trim()) return;
+                  await addItem(newPackingItem.trim());
+                  setNewPackingItem('');
+                }}
+              />
+              <TouchableOpacity
+                style={styles.packingAddBtn}
+                onPress={async () => {
+                  if (!newPackingItem.trim()) return;
+                  await addItem(newPackingItem.trim());
+                  setNewPackingItem('');
+                }}
+              >
+                <Ionicons name="add" size={20} color={colors.textOnDark} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.dateSetupLabel}>Ngày đi *</Text>
-            <DatePicker value={setupStart} onChange={setSetupStart} placeholder="Chọn ngày đi" />
-            <Text style={[styles.dateSetupLabel, { marginTop: spacing.md }]}>Ngày về</Text>
-            <DatePicker
-              value={setupEnd}
-              onChange={setSetupEnd}
-              placeholder="Chọn ngày về"
-              minDate={setupStart ? new Date(setupStart) : undefined}
-            />
-            <View style={{ marginTop: spacing.xl }}>
-              <Button label="Lưu ngày đi" onPress={saveTripDates} loading={savingDates} disabled={!setupStart} />
-            </View>
-          </View>
+          </ScrollView>
         </View>
-      </Modal>
+      )}
 
       {/* ── Add Experience Modal ── */}
       <Modal visible={showAddExp} animationType="slide" transparent onRequestClose={closeAddExp}>
@@ -685,19 +556,6 @@ export default function TripDetailScreen() {
                   ))}
                 </View>
 
-                <Text style={[styles.stepLabel, { marginTop: spacing.lg }]}>Giờ tham quan</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4, marginBottom: spacing.sm }}>
-                  {['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'].map((t) => (
-                    <TouchableOpacity
-                      key={t}
-                      style={[styles.timeChip, addTime === t && styles.timeChipActive]}
-                      onPress={() => setAddTime(addTime === t ? '' : t)}
-                    >
-                      <Text style={[styles.timeChipText, addTime === t && styles.timeChipTextActive]}>{t}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
                 <Text style={[styles.stepLabel, { marginTop: spacing.lg }]}>Ghi chú (tuỳ chọn)</Text>
                 <TextInput
                   style={styles.noteInput}
@@ -738,42 +596,6 @@ const styles = StyleSheet.create({
   tabBtnActive:       { borderBottomWidth: 2, borderBottomColor: colors.primary600 },
   tabText:            { fontSize: 13, fontWeight: '500', color: colors.textMuted },
   tabTextActive:      { color: colors.primary600, fontWeight: '600' },
-  // Setup card
-  setupCard:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primary100, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.primary600 + '40' },
-  setupCardLeft:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  setupCardIcon:    { width: 40, height: 40, borderRadius: radius.lg, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  setupCardTitle:   { fontSize: 14, fontWeight: '700', color: colors.primary600 },
-  setupCardSub:     { fontSize: 12, color: colors.primary600 + 'aa', marginTop: 2 },
-  // AI banner
-  aiBanner:         { backgroundColor: colors.bgCard, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
-  aiBannerTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  aiBannerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  aiBannerTitle:    { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  aiBannerSub:      { fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
-  vibesRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md },
-  vibeChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  vibeChipText:     { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  aiBannerBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.primary600, paddingVertical: 10, borderRadius: radius.lg },
-  aiBannerBtnText:  { color: colors.textOnDark, fontWeight: '600', fontSize: 13 },
-  // Detail modal
-  detailImg:          { width: '100%', height: 200, borderRadius: radius.lg, resizeMode: 'cover', marginBottom: spacing.md },
-  detailImgPlaceholder: { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  detailBody:         { paddingBottom: spacing.lg },
-  detailCatBadge:     { alignSelf: 'flex-start', backgroundColor: colors.primary100, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginBottom: 8 },
-  detailCatText:      { fontSize: 11, fontWeight: '600', color: colors.primary600 },
-  detailTitle:        { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.sm },
-  detailRow:          { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  detailRowText:      { fontSize: 13, color: colors.textMuted },
-  detailNoteBox:      { backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm },
-  detailNoteLabel:    { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginBottom: 4 },
-  detailNoteText:     { fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
-  detailActions:      { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
-  detailDeleteBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.error, paddingVertical: 12, borderRadius: radius.lg },
-  detailDeleteText:   { fontSize: 13, fontWeight: '600', color: colors.error },
-  detailCloseBtn:     { flex: 1, backgroundColor: colors.primary600, paddingVertical: 12, borderRadius: radius.lg, alignItems: 'center' },
-  detailCloseBtnText: { fontSize: 13, fontWeight: '600', color: colors.textOnDark },
-  // Date setup modal
-  dateSetupLabel:   { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: spacing.sm },
   // Timeline empty
   emptyWrap:          { alignItems: 'center', paddingTop: 60, paddingBottom: 40, paddingHorizontal: spacing.xl },
   emptyTitle:         { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' },
@@ -782,36 +604,22 @@ const styles = StyleSheet.create({
   addInlineBtnText:   { color: colors.textOnDark, fontWeight: '700', fontSize: 14 },
   // FAB
   fab:                { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
-  // Day group
-  dayGroup:              { marginBottom: spacing.xl },
-  dayGroupHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  dayPill:               { backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.full },
-  dayPillText:           { fontSize: 12, fontWeight: '700', color: colors.textOnDark },
-  dayAddBtn:             { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  dayAddText:            { fontSize: 12, color: colors.primary600, fontWeight: '600' },
-  aiSuggestBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
-  aiSuggestText:         { color: colors.primary600, fontWeight: '700', fontSize: 14 },
-  // Timeline item
-  timelineItem:          { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  timelineDotWrap:       { alignItems: 'center', width: 20, paddingTop: 14 },
-  timelineDotRing:       { width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgCard },
-  timelineDotInner:      { width: 7, height: 7, borderRadius: 4 },
-  timelineConnector:     { width: 2, flex: 1, marginTop: 4, marginBottom: -4, borderRadius: 1 },
-  timelineCard:          { flex: 1, flexDirection: 'row', backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 3, padding: spacing.sm, gap: 10 },
-  timelineCardContent:   { flex: 1 },
-  timelineTopRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' },
-  slotPill:              { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full },
-  slotPillText:          { fontSize: 11, fontWeight: '600' },
-  catBadge:              { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, backgroundColor: colors.bgScreen },
-  catBadgeText:          { fontSize: 11, color: colors.textMuted, fontWeight: '500' },
-  timelineExp:           { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 4, lineHeight: 20 },
-  timelineLocRow:        { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 3 },
-  timelineLoc:           { fontSize: 11, color: colors.textMuted, flex: 1 },
-  timelineNoteRow:       { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  timelineNote:          { fontSize: 11, color: colors.textMuted, flex: 1 },
-  timelineThumb:         { width: 72, height: 72, borderRadius: radius.md, resizeMode: 'cover', alignSelf: 'center' },
-  timelineThumbPlaceholder: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  deleteBtn:             { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14, padding: 4 },
+  // Timeline items
+  dayGroup:           { marginBottom: spacing.lg },
+  dayGroupTitle:      { fontSize: 13, fontWeight: '700', color: colors.primary600, marginBottom: 10, paddingLeft: 22 },
+  timelineItem:       { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  timelineDotWrap:    { alignItems: 'center', paddingTop: 6 },
+  timelineDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary600 },
+  timelineCard:       { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  timelineImg:        { width: '100%', height: 90, resizeMode: 'cover' },
+  timelineInfo:       { padding: spacing.sm },
+  timelineTopRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  timelineSlot:       { fontSize: 11, color: colors.textMuted },
+  timelineCat:        { fontSize: 11, color: colors.primary600, fontWeight: '500' },
+  timelineExp:        { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 2 },
+  timelineLoc:        { fontSize: 11, color: colors.textMuted },
+  timelineNote:       { fontSize: 11, color: colors.textMuted, marginTop: 4 },
+  deleteBtn:          { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14, padding: 4 },
   // Journal
   journalCard:        { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
   journalHeader:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
@@ -828,6 +636,27 @@ const styles = StyleSheet.create({
   infoRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel:          { fontSize: 13, color: colors.textMuted },
   infoValue:          { fontSize: 13, fontWeight: '500', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
+  // Packing List
+  packingProgress:      { backgroundColor: colors.bgCard, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  packingProgressRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  packingProgressLabel: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  packingPercent:       { fontSize: 13, fontWeight: '700', color: colors.primary600 },
+  progressTrack:        { height: 6, borderRadius: 3, backgroundColor: colors.border },
+  progressFill:         { height: 6, borderRadius: 3, backgroundColor: colors.primary600 },
+  templateSection:      { marginBottom: spacing.lg },
+  templateLabel:        { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  templateChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border },
+  templateChipText:     { fontSize: 13, color: colors.textPrimary, fontWeight: '500' },
+  packingEmpty:         { alignItems: 'center', paddingTop: 40, paddingBottom: 20 },
+  packingItem:          { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bgCard, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginBottom: 8 },
+  checkbox:             { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked:      { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+  packingItemText:      { flex: 1, fontSize: 14, color: colors.textPrimary },
+  packingItemTextDone:  { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+  packingDeleteBtn:     { padding: 4 },
+  packingAddRow:        { flexDirection: 'row', gap: 8, marginTop: spacing.md },
+  packingInput:         { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.bgCard },
+  packingAddBtn:        { width: 42, height: 42, borderRadius: radius.lg, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center' },
   // Modal
   modalOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet:         { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
@@ -858,9 +687,5 @@ const styles = StyleSheet.create({
   slotIcon:           { fontSize: 18, marginBottom: 4 },
   slotLabel:          { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
   slotLabelActive:    { color: colors.primary600 },
-  timeChip:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  timeChipActive:     { backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  timeChipText:       { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  timeChipTextActive: { color: colors.textOnDark },
   noteInput:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 60, backgroundColor: colors.bgScreen },
 });

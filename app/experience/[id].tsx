@@ -1,19 +1,20 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
-  Modal, FlatList, TextInput, ActivityIndicator,
+  Modal, FlatList, TextInput, ActivityIndicator, Animated, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { mockExperiences } from '@/src/data/mock/experiences';
 import { supabase } from '@/lib/supabase';
+import { useBookmarks } from '@/src/hooks/useBookmarks';
 import { Avatar } from '@/src/components/ui/Avatar';
 import { Badge } from '@/src/components/ui/Badge';
 import { Tag } from '@/src/components/ui/Tag';
 import { Button } from '@/src/components/ui/Button';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
-import type { Trip, TimeSlot } from '@/src/types';
+import type { Trip, TimeSlot, BookmarkStatus } from '@/src/types';
 
 const CATEGORY_LABEL: Record<string, string> = {
   food_tour: 'Ẩm thực', workshop: 'Workshop', trekking: 'Thiên nhiên', cultural: 'Văn hóa',
@@ -40,9 +41,29 @@ function tripDayCount(trip: Trip): number {
   return 7;
 }
 
+const BOOKMARK_ICON_COLOR: Record<BookmarkStatus, string> = {
+  want: '#EF4444', planned: '#F59E0B', done: '#22C55E',
+};
+const BOOKMARK_LABEL: Record<BookmarkStatus, string> = {
+  want: 'Muốn đi', planned: 'Đã kế hoạch', done: 'Đã đi',
+};
+
 export default function ExperienceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const experience = mockExperiences.find((e) => e.id === id);
+  const { bookmarks, toggle, setStatus } = useBookmarks();
+  const [showBmSheet, setShowBmSheet] = useState(false);
+  const bmScale = useRef(new Animated.Value(1)).current;
+
+  const bmStatus = id ? bookmarks[id] : undefined;
+
+  function handleBookmark() {
+    Animated.sequence([
+      Animated.timing(bmScale, { toValue: 1.5, duration: 90,  useNativeDriver: true }),
+      Animated.timing(bmScale, { toValue: 1,   duration: 150, useNativeDriver: true }),
+    ]).start();
+    if (id) toggle(id);
+  }
 
   // Modal state
   const [showModal, setShowModal]         = useState(false);
@@ -117,6 +138,20 @@ export default function ExperienceDetailScreen() {
         <Image source={{ uri: experience.coverImage }} style={styles.hero} />
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+        {/* Bookmark button */}
+        <TouchableOpacity
+          style={styles.bmBtn}
+          onPress={handleBookmark}
+          onLongPress={() => setShowBmSheet(true)}
+        >
+          <Animated.View style={{ transform: [{ scale: bmScale }] }}>
+            <Ionicons
+              name={bmStatus ? 'heart' : 'heart-outline'}
+              size={22}
+              color={bmStatus ? BOOKMARK_ICON_COLOR[bmStatus] : '#fff'}
+            />
+          </Animated.View>
         </TouchableOpacity>
         <View style={styles.heroOverlay} />
       </View>
@@ -306,6 +341,42 @@ export default function ExperienceDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Bookmark bottom sheet */}
+      <Modal visible={showBmSheet} transparent animationType="slide" onRequestClose={() => setShowBmSheet(false)}>
+        <Pressable style={styles.bmOverlay} onPress={() => setShowBmSheet(false)}>
+          <Pressable style={styles.bmSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.bmHandle} />
+            <Text style={styles.bmSheetTitle}>Lưu địa điểm</Text>
+            {(['want', 'planned', 'done'] as BookmarkStatus[]).map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={styles.bmItem}
+                onPress={() => { if (id) setStatus(id, s); setShowBmSheet(false); }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="heart" size={18} color={BOOKMARK_ICON_COLOR[s]} />
+                  <Text style={[styles.bmItemText, bmStatus === s && { fontWeight: '700', color: colors.primary600 }]}>
+                    {BOOKMARK_LABEL[s]}
+                  </Text>
+                </View>
+                {bmStatus === s && <Ionicons name="checkmark" size={18} color={colors.primary600} />}
+              </TouchableOpacity>
+            ))}
+            {bmStatus && (
+              <TouchableOpacity
+                style={[styles.bmItem, { borderBottomWidth: 0 }]}
+                onPress={() => { if (id) setStatus(id, null); setShowBmSheet(false); }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="heart-dislike-outline" size={18} color={colors.textMuted} />
+                  <Text style={[styles.bmItemText, { color: colors.textMuted }]}>Bỏ lưu</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -317,6 +388,13 @@ const styles = StyleSheet.create({
   hero:               { width: '100%', height: 280, resizeMode: 'cover' },
   heroOverlay:        { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.15)' },
   backBtn:            { position: 'absolute', top: 48, left: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
+  bmBtn:              { position: 'absolute', top: 48, right: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  bmOverlay:          { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  bmSheet:            { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: spacing.lg, paddingBottom: 32 },
+  bmHandle:           { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  bmSheetTitle:       { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  bmItem:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  bmItemText:         { fontSize: 15, color: colors.textPrimary },
   infoSection:        { padding: spacing.lg, paddingBottom: 0 },
   categoryRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.sm },
   ratingPill:         { backgroundColor: colors.primary100, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
