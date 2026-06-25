@@ -10,3 +10,9 @@ dist/
 *.mobileprovision
 *.orig.*
 web-build/
+
+# AI / IDE
+.claude/
+.idea/
+.cursor/
+.copilot/
