@@ -97,7 +97,7 @@ export default function TripDetailScreen() {
     if (!id) return;
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
-      supabase.from('trip_items').select('*, locations(name, category, hint, cover_image, district, address)').eq('trip_id', id).order('day_number').order('sort_order'),
+      supabase.from('trip_items').select('*, locations(name, category, hint, short_description, long_description, cover_image, district, address)').eq('trip_id', id).order('day_number').order('sort_order'),
       supabase.from('trip_journals').select('*').eq('trip_id', id).order('day_number'),
     ]).then(([t, i, j]) => {
       setTrip(t.data);
@@ -284,12 +284,12 @@ export default function TripDetailScreen() {
             ) : (
               <View style={styles.timelineBody}>
                 {dayItems.map((item, idx) => {
-                  const loc = item.locations;
-                  const title    = item.experience_title    ?? loc?.name     ?? '—';
-                  const locLabel = item.experience_location ?? loc?.district ?? loc?.address ?? null;
-                  const catKey   = item.experience_category ?? loc?.category ?? '';
-                  const cat      = CATEGORY_CONFIG[catKey];
-                  const hint     = loc?.hint ?? null;
+                  const loc        = item.locations;
+                  const title      = item.experience_title    ?? loc?.name     ?? '—';
+                  const locLabel   = item.experience_location ?? loc?.district ?? loc?.address ?? null;
+                  const catKey     = item.experience_category ?? loc?.category ?? '';
+                  const cat        = CATEGORY_CONFIG[catKey];
+                  const shortDesc  = loc?.short_description ?? null;
                   const isLast   = idx === dayItems.length - 1;
                   return (
                     <View key={item.id} style={styles.tlRow}>
@@ -303,18 +303,25 @@ export default function TripDetailScreen() {
                       </View>
 
                       {/* Card */}
-                      <View style={[styles.tlCard, isLast && { marginBottom: 8 }]}>
+                      <TouchableOpacity
+                        style={[styles.tlCard, isLast && { marginBottom: 8 }]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          const destId = item.location_id ?? item.experience_id;
+                          if (destId) router.push(`/experience/${destId}`);
+                        }}
+                      >
                         <View style={styles.tlCardHeader}>
                           <Text style={styles.tlTitle} numberOfLines={2}>{title}</Text>
-                          <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.tlDeleteBtn}>
+                          <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.tlDeleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                             <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>
                         {locLabel && (
                           <Text style={styles.tlLoc} numberOfLines={1}>📍 {locLabel}</Text>
                         )}
-                        {hint ? (
-                          <Text style={styles.tlDesc} numberOfLines={3}>{hint}</Text>
+                        {shortDesc ? (
+                          <Text style={styles.tlDesc} numberOfLines={2}>{shortDesc}</Text>
                         ) : item.note ? (
                           <Text style={styles.tlDesc} numberOfLines={2}>{item.note}</Text>
                         ) : null}
@@ -325,7 +332,7 @@ export default function TripDetailScreen() {
                             </View>
                           </View>
                         )}
-                      </View>
+                      </TouchableOpacity>
                     </View>
                   );
                 })}

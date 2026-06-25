@@ -61,8 +61,27 @@ export default function ExperienceDetailScreen() {
   const [openHours, setOpenHours]   = useState(false);
   const [openContact, setOpenContact] = useState(false);
   const [showBmSheet, setShowBmSheet] = useState(false);
-  const bmScale = useRef(new Animated.Value(1)).current;
+  const bmScale  = useRef(new Animated.Value(1)).current;
+  const scrollY  = useRef(new Animated.Value(0)).current;
   const bmStatus = id ? bookmarks[id] : undefined;
+
+  const HERO_MAX = 240;
+  const HERO_MIN = Math.round(HERO_MAX / 3); // 80px — 1/3 phần dưới hình
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [HERO_MAX, HERO_MIN],
+    extrapolate: 'clamp',
+  });
+  const imageTranslate = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [0, -40],
+    extrapolate: 'clamp',
+  });
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [1, 0.4],
+    extrapolate: 'clamp',
+  });
 
   // Add to trip modal
   const [showModal, setShowModal]       = useState(false);
@@ -129,33 +148,45 @@ export default function ExperienceDetailScreen() {
 
   const maxDays = selectedTrip ? tripDayCount(selectedTrip) : 7;
   const cityLine = [location.district, location.city ?? location.address].filter(Boolean).join(', ');
-  const fullDesc = location.description ?? '';
-  const TRUNCATE = 200;
+  const longDesc   = location.long_description ?? location.description ?? '';
+  const shortText  = location.hint ?? location.short_description ?? '';
+  const fullDesc   = longDesc;
+  const TRUNCATE  = 200;
   const needsTruncate = fullDesc.length > TRUNCATE;
-  const displayDesc = (expanded || !needsTruncate) ? fullDesc : fullDesc.slice(0, TRUNCATE) + '…';
+  const displayDesc   = (expanded || !needsTruncate) ? fullDesc : fullDesc.slice(0, TRUNCATE) + '…';
 
   return (
     <View style={styles.container}>
-      {/* Hero */}
-      <View style={styles.heroWrap}>
-        {location.cover_image
-          ? <Image source={{ uri: location.cover_image }} style={styles.hero} />
-          : <View style={[styles.hero, styles.heroPlaceholder]} />}
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bmBtn} onPress={handleBookmark} onLongPress={() => setShowBmSheet(true)}>
-          <Animated.View style={{ transform: [{ scale: bmScale }] }}>
-            <Ionicons
-              name={bmStatus ? 'heart' : 'heart-outline'}
-              size={22}
-              color={bmStatus ? BOOKMARK_ICON_COLOR[bmStatus] : '#fff'}
-            />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+      {/* Hero — absolute, shrinks on scroll */}
+      <Animated.View style={[styles.heroWrap, { height: heroHeight }]}>
+        <Animated.View style={{ flex: 1, transform: [{ translateY: imageTranslate }], opacity: imageOpacity }}>
+          {location.cover_image
+            ? <Image source={{ uri: location.cover_image }} style={styles.hero} />
+            : <View style={[styles.hero, styles.heroPlaceholder]} />}
+        </Animated.View>
+      </Animated.View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      {/* Fixed buttons above hero */}
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.bmBtn} onPress={handleBookmark} onLongPress={() => setShowBmSheet(true)}>
+        <Animated.View style={{ transform: [{ scale: bmScale }] }}>
+          <Ionicons
+            name={bmStatus ? 'heart' : 'heart-outline'}
+            size={22}
+            color={bmStatus ? BOOKMARK_ICON_COLOR[bmStatus] : '#fff'}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: HERO_MAX, paddingBottom: 120 }}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+      >
         <View style={styles.body}>
           {/* Title */}
           <Text style={styles.title}>{location.name}</Text>
@@ -207,12 +238,12 @@ export default function ExperienceDetailScreen() {
             ) : null}
           </View>
 
-          {/* Hint (short teaser) */}
-          {location.hint ? (
-            <Text style={styles.hint}>{location.hint}</Text>
+          {/* Short description: hint nếu có, fallback sang full description */}
+          {shortText ? (
+            <Text style={styles.hint}>{shortText}</Text>
           ) : null}
 
-          {/* Description with expand */}
+          {/* Full description expandable — chỉ hiện khi hint tồn tại và description khác */}
           {fullDesc ? (
             <View style={styles.descWrap}>
               <Text style={styles.desc}>{displayDesc}</Text>
@@ -270,7 +301,7 @@ export default function ExperienceDetailScreen() {
           </View>
         )}
         <View style={styles.divider} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
@@ -414,11 +445,11 @@ const styles = StyleSheet.create({
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Hero
-  heroWrap:         { height: 240, position: 'relative' },
+  heroWrap:         { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden', zIndex: 2 },
   hero:             { width: '100%', height: 240, resizeMode: 'cover' },
-  heroPlaceholder:  { backgroundColor: colors.border },
-  backBtn:          { position: 'absolute', top: 48, left: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
-  bmBtn:            { position: 'absolute', top: 48, right: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  heroPlaceholder:  { height: 240, backgroundColor: colors.border },
+  backBtn:          { position: 'absolute', top: 48, left: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  bmBtn:            { position: 'absolute', top: 48, right: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
 
   // Body
   body:         { padding: spacing.lg },

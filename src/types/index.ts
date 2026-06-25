@@ -59,6 +59,8 @@ export interface TripItem {
     name: string;
     category: string | null;
     hint: string | null;
+    short_description: string | null;
+    long_description: string | null;
     cover_image: string | null;
     district: string | null;
     address: string | null;
@@ -71,8 +73,9 @@ export interface Location {
   category: string;
   vibes: string[];
   hint: string | null;
-  description: string | null;
   short_description: string | null;
+  long_description: string | null;
+  description: string | null;
   cover_image: string | null;
   images: string[];
   price_per_person: number;
