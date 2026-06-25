@@ -19,6 +19,28 @@ export interface Experience {
   isFeatured: boolean;
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  address: string | null;
+  district: string | null;
+  city: string | null;
+  category: string;
+  vibes: string[];
+  price_per_person: number;
+  duration_minutes: number;
+  rating: number | null;
+  hint: string | null;
+  cover_image: string | null;
+  images: string[];
+  description: string | null;
+  short_description: string | null;
+  opening_hours: string | null;
+  coordinates: { lat: number; lng: number } | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string | null;
@@ -38,12 +60,14 @@ export interface Trip {
   cover_image: string | null;
   status: TripStatus;
   summary_note: string | null;
+  is_ai_generated: boolean;
   created_at: string;
 }
 
 export interface TripItem {
   id: string;
   trip_id: string;
+  location_id: string | null;
   experience_id: string | null;
   experience_title: string | null;
   experience_location: string | null;
@@ -51,8 +75,18 @@ export interface TripItem {
   experience_category: string | null;
   day_number: number;
   time_slot: TimeSlot;
+  visit_time: string | null;
   note: string | null;
+  ai_reason: string | null;
   sort_order: number;
+  // Populated when queried with .select('*, locations(name,category,hint,cover_image,district)')
+  locations?: {
+    name: string;
+    category: string;
+    hint: string | null;
+    cover_image: string | null;
+    district: string | null;
+  } | null;
 }
 
 export type BookmarkStatus = 'want' | 'planned' | 'done';

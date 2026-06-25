@@ -1,0 +1,1 @@
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS is_ai_generated BOOLEAN DEFAULT FALSE;

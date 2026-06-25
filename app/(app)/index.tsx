@@ -8,10 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
 import { useUpcomingTrip } from '@/src/hooks/useUpcomingTrip';
 import { useTodaySchedule } from '@/src/hooks/useTodaySchedule';
-import { useExperiences } from '@/src/hooks/useExperiences';
+import { useLocations } from '@/src/hooks/useLocations';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
-import type { Experience } from '@/src/types';
+import type { Location } from '@/src/types';
 
 const SLOT_ICON: Record<string, string> = {
   morning: '🌅', afternoon: '☀️', evening: '🌙',
@@ -42,10 +42,10 @@ export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
   const { trip, daysUntil, loading: tripLoading } = useUpcomingTrip();
   const { items: scheduleItems, dayNumber } = useTodaySchedule(trip);
-  const { experiences } = useExperiences(null);
+  const { locations } = useLocations(null);
 
   const firstName = user?.user_metadata?.full_name?.split(' ').pop() ?? 'bạn';
-  const recommendations = experiences.slice(0, 8);
+  const recommendations = locations.slice(0, 8);
 
   const tripAction = trip ? `/trip/${trip.id}` : '/(app)/workspace';
 
@@ -240,42 +240,47 @@ export default function HomeScreen() {
   );
 }
 
-function RecCard({ item }: { item: Experience }) {
+function RecCard({ item }: { item: Location }) {
+  const coverUri = item.cover_image ?? `https://picsum.photos/seed/${item.id}/800/600`;
+  const locLabel = item.district ?? item.city ?? '';
   return (
     <TouchableOpacity
       style={styles.recCard}
       activeOpacity={0.88}
       onPress={() => router.push(`/experience/${item.id}` as any)}
     >
-      <Image source={{ uri: item.coverImage }} style={styles.recCardImg} />
+      <Image source={{ uri: coverUri }} style={styles.recCardImg} />
       <View style={styles.recCardOverlay} />
       <View style={styles.recCardContent}>
-        <Text style={styles.recCardTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.recCardTitle} numberOfLines={2}>{item.name}</Text>
         <View style={styles.recCardMeta}>
-          <Text style={styles.recCardLoc} numberOfLines={1}>📍 {item.location}</Text>
-          <Text style={styles.recCardPrice}>{formatPrice(item.price)}đ</Text>
+          <Text style={styles.recCardLoc} numberOfLines={1}>📍 {locLabel}</Text>
+          <Text style={styles.recCardPrice}>{formatPrice(item.price_per_person)}đ</Text>
         </View>
       </View>
-      <View style={styles.recCardRating}>
-        <Ionicons name="star" size={10} color="#FBBF24" />
-        <Text style={styles.recCardRatingText}>{item.rating}</Text>
-      </View>
+      {item.rating != null && (
+        <View style={styles.recCardRating}>
+          <Ionicons name="star" size={10} color="#FBBF24" />
+          <Text style={styles.recCardRatingText}>{item.rating.toFixed(1)}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
 
-function RecCardSmall({ item }: { item: Experience }) {
+function RecCardSmall({ item }: { item: Location }) {
+  const coverUri = item.cover_image ?? `https://picsum.photos/seed/${item.id}/800/600`;
   return (
     <TouchableOpacity
       style={styles.recCardSmall}
       activeOpacity={0.88}
       onPress={() => router.push(`/experience/${item.id}` as any)}
     >
-      <Image source={{ uri: item.coverImage }} style={styles.recCardSmallImg} />
+      <Image source={{ uri: coverUri }} style={styles.recCardSmallImg} />
       <View style={styles.recCardSmallOverlay} />
       <View style={styles.recCardSmallContent}>
-        <Text style={styles.recCardSmallTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.recCardSmallPrice}>{formatPrice(item.price)}đ</Text>
+        <Text style={styles.recCardSmallTitle} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.recCardSmallPrice}>{formatPrice(item.price_per_person)}đ</Text>
       </View>
     </TouchableOpacity>
   );
