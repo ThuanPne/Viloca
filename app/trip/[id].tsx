@@ -97,7 +97,7 @@ export default function TripDetailScreen() {
     if (!id) return;
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
-      supabase.from('trip_items').select('*').eq('trip_id', id).order('day_number').order('sort_order'),
+      supabase.from('trip_items').select('*, locations(name, category, hint, cover_image, district, address)').eq('trip_id', id).order('day_number').order('sort_order'),
       supabase.from('trip_journals').select('*').eq('trip_id', id).order('day_number'),
     ]).then(([t, i, j]) => {
       setTrip(t.data);
@@ -170,13 +170,15 @@ export default function TripDetailScreen() {
         e.location.toLowerCase().includes(expSearch.toLowerCase()))
     : mockExperiences;
 
-  const maxDays = trip ? tripDayCount(trip) : 7;
-
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary600} /></View>;
   if (!trip)   return <View style={styles.center}><Text style={{ color: colors.textMuted }}>Trip không tìm thấy</Text></View>;
 
   // Group items by day
   const dayNumbers = Array.from(new Set(items.map((i) => i.day_number))).sort((a, b) => a - b);
+  const itemMaxDay = dayNumbers.length > 0 ? Math.max(...dayNumbers) : 0;
+  const maxDays = (trip.start_date && trip.end_date)
+    ? tripDayCount(trip)
+    : itemMaxDay > 0 ? itemMaxDay : 7;
   if (dayNumbers.length > 0 && !dayNumbers.includes(selectedDay)) {
     // keep selectedDay as-is; it'll show empty
   }
@@ -282,8 +284,13 @@ export default function TripDetailScreen() {
             ) : (
               <View style={styles.timelineBody}>
                 {dayItems.map((item, idx) => {
-                  const cat = CATEGORY_CONFIG[item.experience_category ?? ''];
-                  const isLast = idx === dayItems.length - 1;
+                  const loc = item.locations;
+                  const title    = item.experience_title    ?? loc?.name     ?? '—';
+                  const locLabel = item.experience_location ?? loc?.district ?? loc?.address ?? null;
+                  const catKey   = item.experience_category ?? loc?.category ?? '';
+                  const cat      = CATEGORY_CONFIG[catKey];
+                  const hint     = loc?.hint ?? null;
+                  const isLast   = idx === dayItems.length - 1;
                   return (
                     <View key={item.id} style={styles.tlRow}>
                       {/* Time column */}
@@ -298,15 +305,18 @@ export default function TripDetailScreen() {
                       {/* Card */}
                       <View style={[styles.tlCard, isLast && { marginBottom: 8 }]}>
                         <View style={styles.tlCardHeader}>
-                          <Text style={styles.tlTitle} numberOfLines={2}>{item.experience_title ?? '—'}</Text>
+                          <Text style={styles.tlTitle} numberOfLines={2}>{title}</Text>
                           <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.tlDeleteBtn}>
                             <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>
-                        {item.note ? (
+                        {locLabel && (
+                          <Text style={styles.tlLoc} numberOfLines={1}>📍 {locLabel}</Text>
+                        )}
+                        {hint ? (
+                          <Text style={styles.tlDesc} numberOfLines={3}>{hint}</Text>
+                        ) : item.note ? (
                           <Text style={styles.tlDesc} numberOfLines={2}>{item.note}</Text>
-                        ) : item.experience_location ? (
-                          <Text style={styles.tlDesc} numberOfLines={1}>📍 {item.experience_location}</Text>
                         ) : null}
                         {cat && (
                           <View style={styles.tlTags}>
@@ -602,9 +612,9 @@ const styles = StyleSheet.create({
   tabTextActive:{ color: colors.primary600, fontWeight: '700' },
 
   // Day selector
-  dayTabsScroll:   { flexShrink: 0, backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
-  dayTabsContent:  { paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 12, gap: 8 },
-  dayTab:          { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
+  dayTabsScroll:   { flexShrink: 0, flexGrow: 0, backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  dayTabsContent:  { paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 12, gap: 8, alignItems: 'center' },
+  dayTab:          { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border, alignSelf: 'center' },
   dayTabActive:    { backgroundColor: DAY_HEADER_BG, borderColor: DAY_HEADER_BG },
   dayTabText:      { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   dayTabTextActive:{ color: '#fff' },
@@ -632,6 +642,7 @@ const styles = StyleSheet.create({
   tlCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4 },
   tlTitle:      { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
   tlDeleteBtn:  { padding: 2 },
+  tlLoc:        { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
   tlDesc:       { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: 8 },
   tlTags:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tlTag:        { backgroundColor: TAG_BG, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
