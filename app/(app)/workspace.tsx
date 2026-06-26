@@ -308,7 +308,7 @@ export default function WorkspaceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary600} />
+        <ActivityIndicator size="large" color={colors.nomad.primary} />
       </View>
     );
   }
@@ -322,7 +322,7 @@ export default function WorkspaceScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.aiBtn} onPress={openModal}>
-            <Ionicons name="sparkles-outline" size={16} color={colors.primary600} />
+            <Ionicons name="sparkles-outline" size={16} color={colors.nomad.primary} />
             <Text style={styles.aiText}>AI Plan</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={openModal}>
@@ -418,7 +418,7 @@ export default function WorkspaceScreen() {
                   onPress={() => { setDestination(item); setShowProvincePicker(false); }}
                 >
                   <Text style={[styles.provinceItemText, destination === item && styles.provinceItemTextActive]}>{item}</Text>
-                  {destination === item && <Ionicons name="checkmark" size={16} color={colors.primary600} />}
+                  {destination === item && <Ionicons name="checkmark" size={16} color={colors.nomad.primary} />}
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />}
@@ -516,7 +516,7 @@ export default function WorkspaceScreen() {
                     activeOpacity={0.85}
                   >
                     <View style={styles.methodIcon}>
-                      <Ionicons name="sparkles" size={28} color={colors.primary600} />
+                      <Ionicons name="sparkles" size={28} color={colors.nomad.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.methodTitle}>Tạo bằng AI</Text>
@@ -658,7 +658,7 @@ export default function WorkspaceScreen() {
                       <View style={[styles.aiLoadingBox, !!error && styles.aiLoadingBoxError, { marginBottom: spacing.md }]}>
                         {creating && (
                           <View style={styles.aiLoadingHeader}>
-                            <ActivityIndicator size="small" color={colors.primary600} />
+                            <ActivityIndicator size="small" color={colors.nomad.primary} />
                             <Text style={styles.aiLoadingText}>AI đang lên lịch trình...</Text>
                           </View>
                         )}
@@ -707,110 +707,112 @@ function formatDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+const N = colors.nomad;
+
 const styles = StyleSheet.create({
   center:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
-  heading:        { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  subheading:     { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  heading:        { fontSize: 22, fontWeight: '800', color: N.onSurface },
+  subheading:     { fontSize: 13, color: N.onSurfaceVariant, marginTop: 2 },
   headerActions:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aiBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  aiText:         { color: colors.primary600, fontWeight: '600', fontSize: 14 },
-  addBtn:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  addText:        { color: colors.textOnDark, fontWeight: '600', fontSize: 14 },
+  aiBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: N.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  aiText:         { color: N.primary, fontWeight: '600', fontSize: 14 },
+  addBtn:         { flexDirection: 'row', alignItems: 'center', backgroundColor: N.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  addText:        { color: N.onPrimary, fontWeight: '600', fontSize: 14 },
 
-  tripCard:       { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.bgCard, elevation: 2 },
+  tripCard:       { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: N.surface, elevation: 2 },
   tripImageWrap:  { height: 100, overflow: 'hidden' },
   tripImage:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: 100, resizeMode: 'cover' },
   tripOverlay:    { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.2)' },
   tripBadge:      { position: 'absolute', top: 12, right: 12 },
-  aiBadge:        { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(200,96,46,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  aiBadge:        { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
   aiBadgeText:    { fontSize: 10, color: '#fff', fontWeight: '700' },
   tripInfo:       { paddingHorizontal: spacing.md, paddingVertical: 6 },
-  tripTitle:      { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 1 },
-  tripDest:       { fontSize: 11, color: colors.textMuted },
-  tripDate:       { fontSize: 11, color: colors.primary600, marginTop: 1, fontWeight: '500' },
+  tripTitle:      { fontSize: 14, fontWeight: '700', color: N.onSurface, marginBottom: 1 },
+  tripDest:       { fontSize: 11, color: N.onSurfaceVariant },
+  tripDate:       { fontSize: 11, color: N.primary, marginTop: 1, fontWeight: '500' },
 
   // Modal
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal:          { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing.lg, paddingBottom: 40, height: '85%' },
-  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
+  modal:          { backgroundColor: N.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing.lg, paddingBottom: 40, height: '85%' },
+  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: N.outlineVariant, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
   modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle:     { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  modalTitle:     { fontSize: 18, fontWeight: '800', color: N.onSurface },
   backBtn:        { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
   // Step indicator
   stepRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
   stepItem:       { flexDirection: 'row', alignItems: 'center' },
-  stepDot:        { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgScreen },
-  stepDotActive:  { borderColor: colors.primary600, backgroundColor: colors.primary600 },
-  stepDotDone:    { borderColor: colors.secondary600, backgroundColor: colors.secondary600 },
-  stepNum:        { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  stepLine:       { width: 40, height: 1.5, backgroundColor: colors.border, marginHorizontal: 4 },
-  stepLineDone:   { backgroundColor: colors.secondary600 },
+  stepDot:        { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: N.outlineVariant, alignItems: 'center', justifyContent: 'center', backgroundColor: N.background },
+  stepDotActive:  { borderColor: N.primary, backgroundColor: N.primary },
+  stepDotDone:    { borderColor: N.secondary, backgroundColor: N.secondary },
+  stepNum:        { fontSize: 11, fontWeight: '700', color: N.onSurfaceVariant },
+  stepLine:       { width: 40, height: 1.5, backgroundColor: N.outlineVariant, marginHorizontal: 4 },
+  stepLineDone:   { backgroundColor: N.secondary },
 
   stepContent:    { paddingTop: spacing.sm },
-  sectionLabel:   { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  sectionLabel:   { fontSize: 15, fontWeight: '700', color: N.onSurface, marginBottom: spacing.md },
 
   // Error
   errorBox:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
   errorText:      { flex: 1, color: colors.error, fontSize: 13 },
 
   // Inputs
-  inputLabel:     { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
-  input:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgScreen },
+  inputLabel:     { fontSize: 13, fontWeight: '600', color: N.onSurfaceVariant, marginBottom: 6 },
+  input:          { borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: N.onSurface, backgroundColor: N.background },
 
   // Chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  chipActive:     { borderColor: colors.primary600, backgroundColor: colors.primary100 },
-  chipText:       { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  chipTextActive: { color: colors.primary600, fontWeight: '700' },
+  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainer },
+  chipActive:     { borderColor: N.primary, backgroundColor: N.onPrimaryContainer },
+  chipText:       { fontSize: 13, color: N.onSurfaceVariant, fontWeight: '500' },
+  chipTextActive: { color: N.primary, fontWeight: '700' },
 
   // Method cards
-  methodCard:         { flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bgScreen, marginBottom: 12 },
+  methodCard:         { flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: N.outlineVariant, backgroundColor: N.background, marginBottom: 12 },
   methodCardDisabled: { opacity: 0.55 },
-  methodIcon:         { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  methodTitle:        { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
-  methodTitleDisabled:{ color: colors.textMuted },
-  methodDesc:         { fontSize: 12, color: colors.textMuted, lineHeight: 17 },
-  freeBadge:          { backgroundColor: colors.secondary100, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full },
-  freeBadgeText:      { fontSize: 10, color: colors.secondary600, fontWeight: '700' },
-  usedBadge:          { backgroundColor: '#F3F4F6', paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full },
-  usedBadgeText:      { fontSize: 10, color: colors.textMuted, fontWeight: '700' },
+  methodIcon:         { width: 52, height: 52, borderRadius: radius.md, backgroundColor: N.onPrimaryContainer, alignItems: 'center', justifyContent: 'center' },
+  methodTitle:        { fontSize: 16, fontWeight: '700', color: N.onSurface, marginBottom: 2 },
+  methodTitleDisabled:{ color: N.onSurfaceVariant },
+  methodDesc:         { fontSize: 12, color: N.onSurfaceVariant, lineHeight: 17 },
+  freeBadge:          { backgroundColor: N.secondaryContainer, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full },
+  freeBadgeText:      { fontSize: 10, color: N.secondary, fontWeight: '700' },
+  usedBadge:          { backgroundColor: N.surfaceContainer, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full },
+  usedBadgeText:      { fontSize: 10, color: N.onSurfaceVariant, fontWeight: '700' },
 
   // Stepper
-  stepper:        { flexDirection: 'row', alignItems: 'center', gap: 0, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
-  stepperBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgScreen },
-  stepperVal:     { paddingHorizontal: 20, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  stepper:        { flexDirection: 'row', alignItems: 'center', gap: 0, borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
+  stepperBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: N.background },
+  stepperVal:     { paddingHorizontal: 20, fontSize: 15, fontWeight: '700', color: N.onSurface },
 
   // Checkbox
   checkRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: spacing.md },
-  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked:{ backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  checkLabel:     { fontSize: 14, color: colors.textPrimary },
+  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: N.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked:{ backgroundColor: N.primary, borderColor: N.primary },
+  checkLabel:     { fontSize: 14, color: N.onSurface },
 
   // AI loading
-  aiLoadingBox:      { padding: spacing.md, backgroundColor: colors.primary100, borderRadius: radius.md, gap: 6 },
+  aiLoadingBox:      { padding: spacing.md, backgroundColor: N.onPrimaryContainer, borderRadius: radius.md, gap: 6 },
   aiLoadingBoxError: { backgroundColor: '#FEF2F2' },
   aiLoadingHeader:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  aiLoadingText:     { fontSize: 14, color: colors.primary600, fontWeight: '600' },
-  aiLogLine:         { fontSize: 12, color: colors.primary600, opacity: 0.8, paddingLeft: 4 },
+  aiLoadingText:     { fontSize: 14, color: N.primary, fontWeight: '600' },
+  aiLogLine:         { fontSize: 12, color: N.primary, opacity: 0.8, paddingLeft: 4 },
   aiLogLineError:    { color: colors.error, opacity: 1, fontWeight: '600' },
 
   // Destination picker
   destPicker:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  destPickerText:        { fontSize: 15, color: colors.textPrimary, flex: 1 },
-  destPickerPlaceholder: { fontSize: 15, color: colors.textMuted, flex: 1 },
-  provinceModal:         { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
+  destPickerText:        { fontSize: 15, color: N.onSurface, flex: 1 },
+  destPickerPlaceholder: { fontSize: 15, color: N.onSurfaceVariant, flex: 1 },
+  provinceModal:         { backgroundColor: N.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
   provinceHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  provinceSearchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.bgScreen },
-  provinceSearchInput:   { flex: 1, fontSize: 14, color: colors.textPrimary },
+  provinceSearchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: N.background },
+  provinceSearchInput:   { flex: 1, fontSize: 14, color: N.onSurface },
   provinceItem:          { paddingHorizontal: spacing.lg, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  provinceItemActive:    { backgroundColor: colors.primary100 },
-  provinceItemText:      { fontSize: 15, color: colors.textPrimary },
-  provinceItemTextActive:{ color: colors.primary600, fontWeight: '700' },
+  provinceItemActive:    { backgroundColor: N.onPrimaryContainer },
+  provinceItemText:      { fontSize: 15, color: N.onSurface },
+  provinceItemTextActive:{ color: N.primary, fontWeight: '700' },
 
   // Date hint
   dateHint:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
-  dateHintText:   { fontSize: 12, color: colors.textMuted },
+  dateHintText:   { fontSize: 12, color: N.onSurfaceVariant },
 });
