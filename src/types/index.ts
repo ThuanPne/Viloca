@@ -172,3 +172,27 @@ export interface TripJournal {
   weather: 'sunny' | 'rainy' | 'cloudy' | null;
   created_at: string;
 }
+
+export interface Post {
+  id: string;
+  user_id: string;
+  content: string | null;
+  images: string[];
+  location_id: string | null;
+  trip_id: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
+  post_likes?: { user_id: string }[];
+}
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
+}

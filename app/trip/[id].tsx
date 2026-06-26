@@ -11,7 +11,8 @@ import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
-import type { Trip, TripItem, TripJournal, TimeSlot, Location } from '@/src/types';
+import { useLocationSearch, CITY_OPTIONS } from '@/src/hooks/useLocationSearch';
+import type { Trip, TripItem, TripJournal, TimeSlot } from '@/src/types';
 
 type Tab = 'timeline' | 'journal' | 'info';
 
@@ -106,16 +107,16 @@ export default function TripDetailScreen() {
   const [selectedItem, setSelectedItem]     = useState<TripItem | null>(null);
 
   // Add location modal
-  const [showAddExp, setShowAddExp]         = useState(false);
-  const [expSearch, setExpSearch]           = useState('');
-  const [locationPool, setLocationPool]     = useState<Location[]>([]);
-  const [selectedLoc, setSelectedLoc]       = useState<Location | null>(null);
-  const [addDay, setAddDay]                 = useState(1);
-  const [addSlot, setAddSlot]              = useState<TimeSlot>('morning');
-  const [addTime, setAddTime]              = useState('');
-  const [addNote, setAddNote]              = useState('');
-  const [adding, setAdding]                 = useState(false);
-  const [addError, setAddError]             = useState('');
+  const [showAddExp, setShowAddExp]   = useState(false);
+  const [selectedLoc, setSelectedLoc] = useState<ReturnType<typeof useLocationSearch>['results'][0] | null>(null);
+  const [addDay, setAddDay]           = useState(1);
+  const [addSlot, setAddSlot]         = useState<TimeSlot>('morning');
+  const [addTime, setAddTime]         = useState('');
+  const [addNote, setAddNote]         = useState('');
+  const [adding, setAdding]           = useState(false);
+  const [addError, setAddError]       = useState('');
+
+  const { query: locQuery, setQuery: setLocQuery, cityCode, setCityCode, results: locResults, loading: locLoading } = useLocationSearch();
 
   useEffect(() => {
     if (!id) return;
@@ -241,28 +242,20 @@ export default function TripDetailScreen() {
     closeAddExp();
   }
 
-  async function openAddExp() {
+  function openAddExp(day?: number) {
     setSelectedLoc(null);
-    setExpSearch('');
-    setAddDay(1);
+    setLocQuery('');
+    setAddDay(day ?? 1);
     setAddSlot('morning');
     setAddTime('');
     setAddNote('');
     setAddError('');
     setShowAddExp(true);
-
-    if (trip) {
-      const { data } = await supabase
-        .from('locations')
-        .select('id, name, category, hint, cover_image, price_per_person, duration_minutes, rating, district, address, vibes, images, description, short_description, opening_hours, coordinates, city, is_active, created_at')
-        .eq('is_active', true)
-        .ilike('address', `%${trip.destination}%`);
-      setLocationPool(data ?? []);
-    }
   }
   function closeAddExp() {
     setShowAddExp(false);
     setSelectedLoc(null);
+    setLocQuery('');
   }
 
   async function removeItem(itemId: string) {
@@ -270,12 +263,6 @@ export default function TripDetailScreen() {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
   }
 
-  const filteredLocations = expSearch.trim()
-    ? locationPool.filter((l) =>
-        l.name.toLowerCase().includes(expSearch.toLowerCase()) ||
-        (l.district ?? '').toLowerCase().includes(expSearch.toLowerCase())
-      )
-    : locationPool;
 
   const maxDays = (() => {
     if (!trip) return 1;
@@ -475,7 +462,7 @@ export default function TripDetailScreen() {
                       <View style={styles.accordionHeaderRight}>
                         <TouchableOpacity
                           style={styles.dayAddBtn}
-                          onPress={() => { setAddDay(dayNum); openAddExp(); }}
+                          onPress={() => openAddExp(dayNum)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <Ionicons name="add" size={14} color={colors.nomad.primary} />
@@ -838,47 +825,84 @@ export default function TripDetailScreen() {
             ) : null}
 
             {!selectedLoc ? (
-              /* Location list */
               <>
+                {/* Search input */}
                 <View style={styles.searchBar}>
                   <Ionicons name="search-outline" size={16} color={colors.textMuted} />
                   <TextInput
                     style={styles.searchInput}
-                    placeholder="Tìm địa điểm..."
+                    placeholder="Tìm địa điểm, quán ăn, di tích..."
                     placeholderTextColor={colors.textMuted}
-                    value={expSearch}
-                    onChangeText={setExpSearch}
+                    value={locQuery}
+                    onChangeText={setLocQuery}
+                    autoFocus
                   />
-                </View>
-                {filteredLocations.length === 0 && (
-                  <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 14 }}>Không có địa điểm cho {trip?.destination}</Text>
-                  </View>
-                )}
-                <FlatList
-                  data={filteredLocations}
-                  keyExtractor={(l) => l.id}
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: 420 }}
-                  renderItem={({ item: loc }) => (
-                    <TouchableOpacity
-                      style={styles.expOption}
-                      activeOpacity={0.8}
-                      onPress={() => setSelectedLoc(loc)}
-                    >
-                      <Image
-                        source={{ uri: loc.cover_image ?? `https://picsum.photos/seed/loc-${loc.id}/100/100` }}
-                        style={styles.expOptionImg}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.expOptionTitle} numberOfLines={1}>{loc.name}</Text>
-                        <Text style={styles.expOptionSub}>📍 {loc.district ?? loc.city}</Text>
-                        <Text style={styles.expOptionCat}>{loc.category}{loc.rating ? ` · ⭐ ${loc.rating}` : ''}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                  {locQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setLocQuery('')}>
+                      <Ionicons name="close-circle" size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                   )}
-                />
+                </View>
+
+                {/* City chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 2, gap: 8, paddingBottom: 10 }}>
+                  {CITY_OPTIONS.map((opt) => {
+                    const active = cityCode === opt.code;
+                    return (
+                      <TouchableOpacity
+                        key={String(opt.code)}
+                        style={[styles.cityChip, active && styles.cityChipActive]}
+                        onPress={() => setCityCode(active ? null : opt.code)}
+                      >
+                        <Text style={[styles.cityChipText, active && styles.cityChipTextActive]}>{opt.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Results */}
+                {locLoading ? (
+                  <ActivityIndicator color={colors.nomad.primary} style={{ paddingVertical: 24 }} />
+                ) : locResults.length === 0 ? (
+                  <View style={{ paddingVertical: 32, alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="location-outline" size={40} color={colors.border} />
+                    <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+                      {locQuery ? 'Không tìm thấy kết quả' : 'Nhập tên địa điểm để tìm kiếm'}
+                    </Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={locResults}
+                    keyExtractor={(l) => l.id}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    style={{ maxHeight: 380 }}
+                    ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border }} />}
+                    renderItem={({ item: loc }) => {
+                      const photo = loc.photos?.split(',')[0]?.trim() ?? loc.cover_image;
+                      const subtitle = [loc.district, loc.city === 'SG' ? 'TP. HCM' : loc.city === 'HN' ? 'Hà Nội' : loc.city === 'DN' ? 'Đà Nẵng' : loc.city].filter(Boolean).join(', ');
+                      const cat = loc.category?.split(',')[0]?.trim();
+                      return (
+                        <TouchableOpacity style={styles.expOption} activeOpacity={0.8} onPress={() => setSelectedLoc(loc)}>
+                          <Image source={{ uri: photo ?? `https://picsum.photos/seed/loc-${loc.id}/100/100` }} style={styles.expOptionImg} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.expOptionTitle} numberOfLines={1}>{loc.name}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                              <Ionicons name="location-outline" size={11} color={colors.textMuted} />
+                              <Text style={styles.expOptionSub} numberOfLines={1}>{subtitle}</Text>
+                            </View>
+                            {cat && (
+                              <View style={[styles.categoryPill, { alignSelf: 'flex-start', marginTop: 4 }]}>
+                                <Text style={styles.categoryPillText}>{cat}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                )}
               </>
             ) : (
               /* Day + Slot picker */
@@ -1090,6 +1114,12 @@ const styles = StyleSheet.create({
   expOptionTitle:     { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   expOptionSub:       { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   expOptionCat:       { fontSize: 11, color: colors.nomad.primary, marginTop: 2 },
+  cityChip:           { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard },
+  cityChipActive:     { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
+  cityChipText:       { fontSize: 12, color: colors.textMuted },
+  cityChipTextActive: { color: colors.nomad.primary, fontWeight: '600' },
+  categoryPill:       { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: '#e8f0d8' },
+  categoryPillText:   { fontSize: 10, color: colors.nomad.primary, fontWeight: '600' },
   pickedExpCard:      { flexDirection: 'row', gap: 10, backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
   pickedExpImg:       { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
   pickedExpTitle:     { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
