@@ -121,7 +121,7 @@ export default function TripDetailScreen() {
     if (!id) return;
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
-      supabase.from('trip_items').select('*, locations(name, category, hint, cover_image, district)').eq('trip_id', id).order('day_number').order('sort_order'),
+      supabase.from('trip_items').select('*, locations(name, category, hint, short_description, long_description, cover_image, district, address, price_per_person, duration_minutes, rating, opening_hours)').eq('trip_id', id).order('day_number').order('sort_order'),
       supabase.from('trip_journals').select('*').eq('trip_id', id).order('day_number'),
     ]).then(([t, i, j]) => {
       setTrip(t.data);
@@ -500,12 +500,12 @@ export default function TripDetailScreen() {
                           dayItems.map((item, idx) => {
                             const isLast    = idx === dayItems.length - 1;
                             const locData   = item.locations ?? null;
-                            const isAIItem  = trip.is_ai_generated && !!item.location_id;
+                            const isAIItem  = false;
 
-                            const displayTitle    = isAIItem ? 'Địa điểm bí ẩn' : (locData?.name ?? item.experience_title ?? '—');
-                            const displayLocation = isAIItem ? null : (locData?.district ?? item.experience_location);
-                            const hintText        = isAIItem ? (item.note ?? locData?.hint) : null;
-                            const displayNote     = !isAIItem ? item.note : null;
+                            const displayTitle    = locData?.name ?? item.experience_title ?? '—';
+                            const displayLocation = locData?.district ?? item.experience_location;
+                            const hintText        = item.note ?? locData?.hint ?? null;
+                            const displayNote     = item.note ?? null;
                             const displayCategory = locData?.category ?? item.experience_category;
 
                             const slotIdx  = dayItems.filter(i => i.time_slot === item.time_slot).findIndex(i => i.id === item.id);
@@ -528,7 +528,13 @@ export default function TripDetailScreen() {
                                 <TouchableOpacity
                                   style={styles.timelineCard}
                                   activeOpacity={0.85}
-                                  onPress={() => setSelectedItem(item)}
+                                  onPress={() => {
+                                    const destId = item.location_id ?? item.experience_id;
+                                    if (destId) router.push(`/experience/${destId}`);
+                                    else setSelectedItem(item);
+                                  }}
+                                  onLongPress={() => setSelectedItem(item)}
+                                  delayLongPress={400}
                                 >
                                   <View style={styles.cardTitleRow}>
                                     <Text
@@ -668,12 +674,19 @@ export default function TripDetailScreen() {
             <View style={styles.modalHandle} />
 
             {selectedItem && (() => {
+              const loc  = selectedItem.locations as any;
               const slot = TIME_SLOTS.find(s => s.value === selectedItem.time_slot);
+              const coverImg  = loc?.cover_image ?? selectedItem.experience_image;
+              const title     = loc?.name ?? selectedItem.experience_title ?? '—';
+              const locLabel  = loc?.district ?? loc?.address ?? selectedItem.experience_location;
+              const category  = loc?.category ?? selectedItem.experience_category;
+              const shortDesc = loc?.short_description ?? loc?.hint ?? selectedItem.note;
+              const longDesc  = loc?.long_description;
               return (
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {/* Cover image */}
-                  {selectedItem.experience_image ? (
-                    <Image source={{ uri: selectedItem.experience_image }} style={styles.detailImg} />
+                  {coverImg ? (
+                    <Image source={{ uri: coverImg }} style={styles.detailImg} />
                   ) : (
                     <View style={styles.detailImgPlaceholder}>
                       <Ionicons name="image-outline" size={40} color={colors.border} />
@@ -682,20 +695,20 @@ export default function TripDetailScreen() {
 
                   <View style={styles.detailBody}>
                     {/* Category badge */}
-                    {selectedItem.experience_category && (
+                    {category && (
                       <View style={styles.detailCatBadge}>
-                        <Text style={styles.detailCatText}>{CATEGORY_LABEL[selectedItem.experience_category] ?? selectedItem.experience_category}</Text>
+                        <Text style={styles.detailCatText}>{CATEGORY_LABEL[category] ?? category}</Text>
                       </View>
                     )}
 
                     {/* Title */}
-                    <Text style={styles.detailTitle}>{selectedItem.experience_title ?? '—'}</Text>
+                    <Text style={styles.detailTitle}>{title}</Text>
 
                     {/* Location */}
-                    {selectedItem.experience_location && (
+                    {locLabel && (
                       <View style={styles.detailRow}>
                         <Ionicons name="location-outline" size={15} color={colors.textMuted} />
-                        <Text style={styles.detailRowText}>{selectedItem.experience_location}</Text>
+                        <Text style={styles.detailRowText}>{locLabel}</Text>
                       </View>
                     )}
 
@@ -708,8 +721,36 @@ export default function TripDetailScreen() {
                       </Text>
                     </View>
 
+                    {/* Rating + duration + price */}
+                    {!!(loc?.rating || loc?.duration_minutes || loc?.price_per_person) && (
+                      <View style={[styles.detailRow, { flexWrap: 'wrap', gap: 12 }]}>
+                        {loc?.rating && (
+                          <Text style={styles.detailMeta}>⭐ {loc.rating}</Text>
+                        )}
+                        {loc?.duration_minutes && (
+                          <Text style={styles.detailMeta}>⏱ {loc.duration_minutes >= 60 ? `${Math.floor(loc.duration_minutes / 60)}h` : `${loc.duration_minutes}p`}</Text>
+                        )}
+                        {loc?.price_per_person && (
+                          <Text style={styles.detailMeta}>💰 {(loc.price_per_person / 1000).toFixed(0)}k/người</Text>
+                        )}
+                        {loc?.opening_hours && (
+                          <Text style={styles.detailMeta}>🕐 {loc.opening_hours}</Text>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Short description */}
+                    {shortDesc && (
+                      <Text style={styles.detailDesc}>{shortDesc}</Text>
+                    )}
+
+                    {/* Long description */}
+                    {longDesc && longDesc !== shortDesc && (
+                      <Text style={[styles.detailDesc, { color: colors.textMuted }]}>{longDesc}</Text>
+                    )}
+
                     {/* Note */}
-                    {selectedItem.note && (
+                    {selectedItem.note && !shortDesc?.includes(selectedItem.note) && (
                       <View style={styles.detailNoteBox}>
                         <Text style={styles.detailNoteLabel}>Ghi chú</Text>
                         <Text style={styles.detailNoteText}>{selectedItem.note}</Text>
@@ -718,8 +759,11 @@ export default function TripDetailScreen() {
 
                     {/* AI reason */}
                     {selectedItem.ai_reason && (
-                      <View style={[styles.detailNoteBox, { marginTop: 8 }]}>
-                        <Text style={styles.detailNoteLabel}>Tại sao AI chọn?</Text>
+                      <View style={[styles.detailNoteBox, { marginTop: 8, borderColor: colors.nomad.primary + '40', backgroundColor: '#e8f0d8' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                          <Ionicons name="sparkles" size={12} color={colors.nomad.primary} />
+                          <Text style={[styles.detailNoteLabel, { color: colors.nomad.primary }]}>AI chọn vì</Text>
+                        </View>
                         <Text style={styles.detailNoteText}>{selectedItem.ai_reason}</Text>
                       </View>
                     )}
@@ -971,6 +1015,8 @@ const styles = StyleSheet.create({
   detailRowText:      { fontSize: 13, color: colors.textMuted },
   detailNoteBox:      { backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm },
   detailNoteLabel:    { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginBottom: 4 },
+  detailMeta:         { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  detailDesc:         { fontSize: 14, color: colors.textPrimary, lineHeight: 21, marginTop: spacing.sm },
   detailNoteText:     { fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
   detailActions:      { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
   detailDeleteBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.error, paddingVertical: 12, borderRadius: radius.lg },
