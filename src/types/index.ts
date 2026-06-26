@@ -1,4 +1,53 @@
 export type ExperienceCategory = 'food_tour' | 'workshop' | 'trekking' | 'cultural';
+export type PlaceRegion = 'north' | 'central' | 'south';
+
+export interface Location {
+  id: string;
+  city: string | null;
+  name: string;
+  district: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+  category: string | null;
+  style_tag: string | null;
+  price_level: number | null;
+  opening_hours: string | null;
+  closing_hours: string | null;
+  off_days: string | null;
+  phone: string | null;
+  short_description: string | null;
+  long_description: string | null;
+  photos: string | null;
+  verified: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** @deprecated Use Location instead */
+export interface Place {
+  id: string;
+  name: string;
+  slug: string;
+  region: PlaceRegion;
+  cover_image: string | null;
+  description: string | null;
+  experience_types: string[];
+  created_at: string;
+}
+
+export interface Festival {
+  id: string;
+  name: string;
+  location: string;
+  cover_image: string | null;
+  month: number;
+  start_date: string | null;
+  end_date: string | null;
+  description: string | null;
+  tags: string[];
+  created_at: string;
+}
 export type TripStatus = 'planning' | 'active' | 'completed';
 export type TimeSlot = 'morning' | 'afternoon' | 'evening';
 
@@ -38,6 +87,7 @@ export interface Trip {
   cover_image: string | null;
   status: TripStatus;
   summary_note: string | null;
+  place_id: string | null;
   created_at: string;
 }
 

@@ -16,3 +16,13 @@ web-build/
 .idea/
 .cursor/
 .copilot/
+
+# Supabase
+supabase/.temp/
+
+# Credentials / sensitive data
+*.csv
+assets/viloca_credentials.csv
+Locations_data/
+Screenshot/
+stitch_hidden_gem_travel_app/

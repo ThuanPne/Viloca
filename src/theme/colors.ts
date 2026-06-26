@@ -18,4 +18,26 @@ export const colors = {
   error:   '#DC2626',
   warning: '#F59E0B',
   success: '#16A34A',
+
+  // Organic Nomad palette
+  nomad: {
+    surface:          '#fafaf0',
+    surfaceDim:       '#dadbd1',
+    surfaceContainer: '#eeeee5',
+    surfaceContainerLow: '#f4f4ea',
+    onSurface:        '#1a1c17',
+    onSurfaceVariant: '#44483c',
+    outline:          '#75796a',
+    outlineVariant:   '#c4c8b7',
+    primary:          '#45611b',
+    onPrimary:        '#ffffff',
+    primaryContainer: '#5d7a32',
+    onPrimaryContainer: '#e8ffc2',
+    secondary:        '#56641f',
+    secondaryContainer: '#daeb95',
+    inverseSurface:   '#2f312b',
+    inverseOnSurface: '#f1f1e7',
+    background:       '#fafaf0',
+    onBackground:     '#1a1c17',
+  },
 } as const;
