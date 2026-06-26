@@ -1,23 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
-  Modal, FlatList, TextInput, ActivityIndicator,
+  Modal, FlatList, TextInput, ActivityIndicator, Animated, Pressable, Linking,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { mockExperiences } from '@/src/data/mock/experiences';
-import { supabase } from '@/lib/supabase';
-import { Avatar } from '@/src/components/ui/Avatar';
-import { Badge } from '@/src/components/ui/Badge';
-import { Tag } from '@/src/components/ui/Tag';
+import { useBookmarks } from '@/src/hooks/useBookmarks';
 import { Button } from '@/src/components/ui/Button';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
-import type { Trip, TimeSlot } from '@/src/types';
+import supabase from '@/src/lib/supabase';
+import type { Location, Trip, TimeSlot, BookmarkStatus } from '@/src/types';
 
-const CATEGORY_LABEL: Record<string, string> = {
-  food_tour: 'Ẩm thực', workshop: 'Workshop', trekking: 'Thiên nhiên', cultural: 'Văn hóa',
-};
 const TIME_SLOTS: { value: TimeSlot; label: string; icon: string }[] = [
   { value: 'morning',   label: 'Buổi sáng',  icon: '🌅' },
   { value: 'afternoon', label: 'Buổi chiều', icon: '☀️' },
@@ -26,9 +20,22 @@ const TIME_SLOTS: { value: TimeSlot; label: string; icon: string }[] = [
 const STATUS_LABEL: Record<string, string> = {
   planning: 'Lên kế hoạch', active: 'Đang đi', completed: 'Hoàn thành',
 };
+const BOOKMARK_ICON_COLOR: Record<BookmarkStatus, string> = {
+  want: '#EF4444', planned: '#F59E0B', done: '#22C55E',
+};
+const BOOKMARK_LABEL: Record<BookmarkStatus, string> = {
+  want: 'Muốn đi', planned: 'Đã kế hoạch', done: 'Đã đi',
+};
 
 function formatPrice(p: number) {
+  if (p === 0) return 'Miễn phí';
   return p.toLocaleString('vi-VN') + 'đ';
+}
+function formatDuration(mins: number) {
+  if (mins < 60) return `${mins} phút`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}g${m}p` : `${h} giờ`;
 }
 function tripDayCount(trip: Trip): number {
   if (trip.start_date && trip.end_date) {
@@ -39,21 +46,67 @@ function tripDayCount(trip: Trip): number {
   }
   return 7;
 }
+function buildMapsUrl(loc: Location): string {
+  if (loc.coordinates) return `https://maps.google.com/?q=${loc.coordinates.lat},${loc.coordinates.lng}`;
+  const q = encodeURIComponent([loc.name, loc.address].filter(Boolean).join(', '));
+  return `https://maps.google.com/?q=${q}`;
+}
 
 export default function ExperienceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const experience = mockExperiences.find((e) => e.id === id);
+  const { bookmarks, toggle, setStatus } = useBookmarks();
+  const [location, setLocation]     = useState<Location | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [expanded, setExpanded]     = useState(false);
+  const [openHours, setOpenHours]   = useState(false);
+  const [openContact, setOpenContact] = useState(false);
+  const [showBmSheet, setShowBmSheet] = useState(false);
+  const bmScale  = useRef(new Animated.Value(1)).current;
+  const scrollY  = useRef(new Animated.Value(0)).current;
+  const bmStatus = id ? bookmarks[id] : undefined;
 
-  // Modal state
-  const [showModal, setShowModal]         = useState(false);
-  const [trips, setTrips]                 = useState<Trip[]>([]);
-  const [loadingTrips, setLoadingTrips]   = useState(false);
-  const [selectedTrip, setSelectedTrip]   = useState<Trip | null>(null);
-  const [selectedDay, setSelectedDay]     = useState(1);
-  const [selectedSlot, setSelectedSlot]   = useState<TimeSlot>('morning');
-  const [note, setNote]                   = useState('');
-  const [adding, setAdding]               = useState(false);
-  const [addError, setAddError]           = useState('');
+  const HERO_MAX = 240;
+  const HERO_MIN = Math.round(HERO_MAX / 3); // 80px — 1/3 phần dưới hình
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [HERO_MAX, HERO_MIN],
+    extrapolate: 'clamp',
+  });
+  const imageTranslate = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [0, -40],
+    extrapolate: 'clamp',
+  });
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HERO_MAX - HERO_MIN],
+    outputRange: [1, 0.4],
+    extrapolate: 'clamp',
+  });
+
+  // Add to trip modal
+  const [showModal, setShowModal]       = useState(false);
+  const [trips, setTrips]               = useState<Trip[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [selectedDay, setSelectedDay]   = useState(1);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot>('morning');
+  const [note, setNote]                 = useState('');
+  const [adding, setAdding]             = useState(false);
+  const [addError, setAddError]         = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    supabase.from('locations').select('*').eq('id', id).single()
+      .then(({ data }) => { setLocation(data); setLoading(false); });
+  }, [id]);
+
+  function handleBookmark() {
+    Animated.sequence([
+      Animated.timing(bmScale, { toValue: 1.5, duration: 90,  useNativeDriver: true }),
+      Animated.timing(bmScale, { toValue: 1,   duration: 150, useNativeDriver: true }),
+    ]).start();
+    if (id) toggle(id);
+  }
 
   const openModal = useCallback(async () => {
     setShowModal(true);
@@ -65,128 +118,199 @@ export default function ExperienceDetailScreen() {
     setLoadingTrips(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const { data } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
+      const { data } = await supabase.from('trips').select('*')
+        .eq('user_id', session.user.id).order('created_at', { ascending: false });
       setTrips(data ?? []);
     }
     setLoadingTrips(false);
   }, []);
 
   async function handleAddToTrip() {
-    if (!selectedTrip || !experience) return;
+    if (!selectedTrip || !location) return;
     setAdding(true);
     setAddError('');
     const { error } = await supabase.from('trip_items').insert({
-      trip_id:              selectedTrip.id,
-      experience_id:        null,
-      experience_title:     experience.title,
-      experience_location:  experience.location,
-      experience_image:     experience.coverImage,
-      experience_category:  experience.category,
-      day_number:           selectedDay,
-      time_slot:            selectedSlot,
-      note:                 note.trim() || null,
-      sort_order:           0,
+      trip_id:     selectedTrip.id,
+      location_id: location.id,
+      day_number:  selectedDay,
+      time_slot:   selectedSlot,
+      note:        note.trim() || null,
+      sort_order:  0,
     });
     setAdding(false);
-    if (error) {
-      setAddError('Không thể thêm vào trip: ' + error.message);
-      return;
-    }
+    if (error) { setAddError('Không thể thêm: ' + error.message); return; }
     setShowModal(false);
     router.push(`/trip/${selectedTrip.id}`);
   }
 
-  if (!experience) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: colors.textMuted }}>Không tìm thấy trải nghiệm</Text>
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary600} /></View>;
+  if (!location) return <View style={styles.center}><Text style={{ color: colors.textMuted }}>Không tìm thấy địa điểm</Text></View>;
 
   const maxDays = selectedTrip ? tripDayCount(selectedTrip) : 7;
+  const cityLine = [location.district, location.city ?? location.address].filter(Boolean).join(', ');
+  const longDesc   = location.long_description ?? location.description ?? '';
+  const shortText  = location.hint ?? location.short_description ?? '';
+  const fullDesc   = longDesc;
+  const TRUNCATE  = 200;
+  const needsTruncate = fullDesc.length > TRUNCATE;
+  const displayDesc   = (expanded || !needsTruncate) ? fullDesc : fullDesc.slice(0, TRUNCATE) + '…';
 
   return (
     <View style={styles.container}>
-      {/* Hero image */}
-      <View style={styles.heroWrap}>
-        <Image source={{ uri: experience.coverImage }} style={styles.hero} />
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.heroOverlay} />
-      </View>
+      {/* Hero — absolute, shrinks on scroll */}
+      <Animated.View style={[styles.heroWrap, { height: heroHeight }]}>
+        <Animated.View style={{ flex: 1, transform: [{ translateY: imageTranslate }], opacity: imageOpacity }}>
+          {location.cover_image
+            ? <Image source={{ uri: location.cover_image }} style={styles.hero} />
+            : <View style={[styles.hero, styles.heroPlaceholder]} />}
+        </Animated.View>
+      </Animated.View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Info */}
-        <View style={styles.infoSection}>
-          <View style={styles.categoryRow}>
-            <Badge label={CATEGORY_LABEL[experience.category]} color="primary" />
-            <View style={styles.ratingPill}>
-              <Text style={styles.ratingText}>⭐ {experience.rating} ({experience.reviewCount})</Text>
+      {/* Fixed buttons above hero */}
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.bmBtn} onPress={handleBookmark} onLongPress={() => setShowBmSheet(true)}>
+        <Animated.View style={{ transform: [{ scale: bmScale }] }}>
+          <Ionicons
+            name={bmStatus ? 'heart' : 'heart-outline'}
+            size={22}
+            color={bmStatus ? BOOKMARK_ICON_COLOR[bmStatus] : '#fff'}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: HERO_MAX, paddingBottom: 120 }}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+      >
+        <View style={styles.body}>
+          {/* Title */}
+          <Text style={styles.title}>{location.name}</Text>
+
+          {/* Location chip */}
+          {cityLine ? (
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.locationText}>{cityLine}</Text>
             </View>
-          </View>
-          <Text style={styles.title}>{experience.title}</Text>
-          <Text style={styles.location}>📍 {experience.location}</Text>
+          ) : null}
 
+          {/* Vibes tags */}
+          {location.vibes?.length > 0 && (
+            <View style={styles.tagsRow}>
+              {location.vibes.map((v) => (
+                <View key={v} style={styles.tag}><Text style={styles.tagText}>{v}</Text></View>
+              ))}
+            </View>
+          )}
+
+          {/* Price + Duration row */}
           <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={16} color={colors.textMuted} />
-              <Text style={styles.metaText}>{experience.durationHours} giờ</Text>
+            <View style={styles.metaChip}>
+              <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>{formatPrice(location.price_per_person)}</Text>
             </View>
-            <View style={styles.metaSep} />
-            <View style={styles.metaItem}>
-              <Ionicons name="cash-outline" size={16} color={colors.textMuted} />
-              <Text style={styles.metaText}>{formatPrice(experience.price)} / người</Text>
+            <View style={styles.metaDot} />
+            <View style={styles.metaChip}>
+              <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>{formatDuration(location.duration_minutes)}</Text>
             </View>
+            {location.rating != null && (
+              <>
+                <View style={styles.metaDot} />
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaText}>⭐ {Number(location.rating).toFixed(1)}</Text>
+                </View>
+              </>
+            )}
+            {location.opening_hours ? (
+              <>
+                <View style={styles.metaDot} />
+                <View style={styles.metaChip}>
+                  <Ionicons name="alarm-outline" size={14} color={colors.textMuted} />
+                  <Text style={styles.metaText}>{location.opening_hours}</Text>
+                </View>
+              </>
+            ) : null}
           </View>
-        </View>
 
-        {/* Guide */}
-        <View style={styles.guideSection}>
-          <Text style={styles.sectionTitle}>Người hướng dẫn</Text>
-          <View style={styles.guideRow}>
-            <Avatar uri={experience.guideAvatar} name={experience.guideName} size={44} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.guideName}>{experience.guideName}</Text>
-              <Text style={styles.guideLabel}>Local Guide</Text>
+          {/* Short description: hint nếu có, fallback sang full description */}
+          {shortText ? (
+            <Text style={styles.hint}>{shortText}</Text>
+          ) : null}
+
+          {/* Full description expandable — chỉ hiện khi hint tồn tại và description khác */}
+          {fullDesc ? (
+            <View style={styles.descWrap}>
+              <Text style={styles.desc}>{displayDesc}</Text>
+              {needsTruncate && (
+                <TouchableOpacity onPress={() => setExpanded((e) => !e)}>
+                  <Text style={styles.expandBtn}>{expanded ? 'Ẩn bớt ▲' : 'Xem thêm ▼'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#059669" />
-              <Text style={styles.verifiedText}>Đã xác minh</Text>
-            </View>
+          ) : null}
+        </View>
+
+        {/* Giờ mở cửa accordion */}
+        <TouchableOpacity style={styles.accordion} onPress={() => setOpenHours((v) => !v)} activeOpacity={0.8}>
+          <Text style={styles.accordionTitle}>Giờ mở cửa</Text>
+          <Ionicons name={openHours ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        {openHours && (
+          <View style={styles.accordionBody}>
+            <Text style={styles.accordionText}>
+              {location.opening_hours ?? 'Mở cửa hàng ngày · Liên hệ để xác nhận giờ cụ thể'}
+            </Text>
           </View>
-        </View>
+        )}
+        <View style={styles.divider} />
 
-        {/* Description */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mô tả</Text>
-          <Text style={styles.description}>{experience.description}</Text>
-        </View>
-
-        {/* Tags */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tags</Text>
-          <View style={styles.tagsWrap}>
-            {experience.tags.map((tag) => (
-              <Tag key={tag} label={tag} color="forest" />
-            ))}
+        {/* Liên hệ & Địa chỉ accordion */}
+        <TouchableOpacity style={styles.accordion} onPress={() => setOpenContact((v) => !v)} activeOpacity={0.8}>
+          <Text style={styles.accordionTitle}>Liên hệ & Địa chỉ</Text>
+          <Ionicons name={openContact ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        {openContact && (
+          <View style={styles.accordionBody}>
+            {location.address ? (
+              <View style={styles.contactRow}>
+                <Ionicons name="location-outline" size={15} color={colors.textMuted} />
+                <Text style={styles.accordionText}>{location.address}</Text>
+              </View>
+            ) : null}
+            {location.phone ? (
+              <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL(`tel:${location.phone}`)}>
+                <Ionicons name="call-outline" size={15} color={colors.textMuted} />
+                <Text style={[styles.accordionText, { color: colors.primary600 }]}>{location.phone}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {location.website ? (
+              <TouchableOpacity style={styles.contactRow} onPress={() => location.website && Linking.openURL(location.website)}>
+                <Ionicons name="globe-outline" size={15} color={colors.textMuted} />
+                <Text style={[styles.accordionText, { color: colors.primary600 }]} numberOfLines={1}>{location.website}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {!location.address && !location.phone && !location.website && (
+              <Text style={styles.accordionText}>Chưa có thông tin liên hệ</Text>
+            )}
           </View>
-        </View>
-      </ScrollView>
+        )}
+        <View style={styles.divider} />
+      </Animated.ScrollView>
 
-      {/* Bottom CTA */}
+      {/* Bottom bar */}
       <View style={styles.bottomBar}>
-        <View>
-          <Text style={styles.priceLabel}>Giá từ</Text>
-          <Text style={styles.priceValue}>{formatPrice(experience.price)}</Text>
-        </View>
+        <TouchableOpacity style={styles.mapsBtn} onPress={() => Linking.openURL(buildMapsUrl(location))} activeOpacity={0.85}>
+          <Ionicons name="map-outline" size={17} color={colors.textOnDark} />
+          <Text style={styles.mapsBtnText}>Mở Google Maps</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addBtn} onPress={openModal} activeOpacity={0.85}>
-          <Ionicons name="add-circle-outline" size={18} color={colors.textOnDark} />
+          <Ionicons name="add-circle-outline" size={17} color={colors.primary600} />
           <Text style={styles.addBtnText}>Thêm vào Trip</Text>
         </TouchableOpacity>
       </View>
@@ -203,12 +327,13 @@ export default function ExperienceDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Experience mini card */}
             <View style={styles.expMini}>
-              <Image source={{ uri: experience.coverImage }} style={styles.expMiniImg} />
+              {location.cover_image
+                ? <Image source={{ uri: location.cover_image }} style={styles.expMiniImg} />
+                : <View style={[styles.expMiniImg, { backgroundColor: colors.border }]} />}
               <View style={{ flex: 1 }}>
-                <Text style={styles.expMiniTitle} numberOfLines={1}>{experience.title}</Text>
-                <Text style={styles.expMiniLoc}>📍 {experience.location}</Text>
+                <Text style={styles.expMiniTitle} numberOfLines={1}>{location.name}</Text>
+                {cityLine ? <Text style={styles.expMiniLoc}>📍 {cityLine}</Text> : null}
               </View>
             </View>
 
@@ -220,7 +345,6 @@ export default function ExperienceDetailScreen() {
             ) : null}
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Step 1: Pick Trip */}
               <Text style={styles.stepLabel}>1. Chọn chuyến đi</Text>
               {loadingTrips ? (
                 <ActivityIndicator color={colors.primary600} style={{ marginVertical: 16 }} />
@@ -239,64 +363,43 @@ export default function ExperienceDetailScreen() {
                     onPress={() => { setSelectedTrip(t); setSelectedDay(1); }}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.tripOptionTitle, selectedTrip?.id === t.id && styles.tripOptionTitleActive]} numberOfLines={1}>
-                        {t.title}
-                      </Text>
+                      <Text style={[styles.tripOptionTitle, selectedTrip?.id === t.id && styles.tripOptionTitleActive]} numberOfLines={1}>{t.title}</Text>
                       <Text style={styles.tripOptionSub}>📍 {t.destination} · {STATUS_LABEL[t.status]}</Text>
                     </View>
-                    {selectedTrip?.id === t.id && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary600} />
-                    )}
+                    {selectedTrip?.id === t.id && <Ionicons name="checkmark-circle" size={20} color={colors.primary600} />}
                   </TouchableOpacity>
                 ))
               )}
 
-              {/* Step 2: Pick Day */}
               {selectedTrip && (
                 <>
                   <Text style={[styles.stepLabel, { marginTop: spacing.lg }]}>2. Chọn ngày</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4, alignItems: 'center' }}>
                     {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
-                      <TouchableOpacity
-                        key={d}
-                        style={[styles.dayChip, selectedDay === d && styles.dayChipActive]}
-                        onPress={() => setSelectedDay(d)}
-                      >
+                      <TouchableOpacity key={d} style={[styles.dayChip, selectedDay === d && styles.dayChipActive]} onPress={() => setSelectedDay(d)}>
                         <Text style={[styles.dayChipText, selectedDay === d && styles.dayChipTextActive]}>Ngày {d}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
 
-                  {/* Step 3: Pick Slot */}
                   <Text style={[styles.stepLabel, { marginTop: spacing.lg }]}>3. Thời điểm</Text>
                   <View style={styles.slotRow}>
                     {TIME_SLOTS.map((slot) => (
-                      <TouchableOpacity
-                        key={slot.value}
-                        style={[styles.slotBtn, selectedSlot === slot.value && styles.slotBtnActive]}
-                        onPress={() => setSelectedSlot(slot.value)}
-                      >
+                      <TouchableOpacity key={slot.value} style={[styles.slotBtn, selectedSlot === slot.value && styles.slotBtnActive]} onPress={() => setSelectedSlot(slot.value)}>
                         <Text style={styles.slotIcon}>{slot.icon}</Text>
-                        <Text style={[styles.slotLabel, selectedSlot === slot.value && styles.slotLabelActive]}>
-                          {slot.label}
-                        </Text>
+                        <Text style={[styles.slotLabel, selectedSlot === slot.value && styles.slotLabelActive]}>{slot.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
 
-                  {/* Note */}
                   <Text style={[styles.stepLabel, { marginTop: spacing.lg }]}>4. Ghi chú (tuỳ chọn)</Text>
                   <TextInput
                     style={styles.noteInput}
                     placeholder="Đặt vé trước / Mang giày trekking / ..."
                     placeholderTextColor={colors.textMuted}
-                    value={note}
-                    onChangeText={setNote}
-                    multiline
-                    numberOfLines={2}
-                    textAlignVertical="top"
+                    value={note} onChangeText={setNote}
+                    multiline numberOfLines={2} textAlignVertical="top"
                   />
-
                   <View style={{ marginTop: spacing.lg }}>
                     <Button label="Thêm vào lịch trình" onPress={handleAddToTrip} loading={adding} />
                   </View>
@@ -306,72 +409,118 @@ export default function ExperienceDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Bookmark sheet */}
+      <Modal visible={showBmSheet} transparent animationType="slide" onRequestClose={() => setShowBmSheet(false)}>
+        <Pressable style={styles.bmOverlay} onPress={() => setShowBmSheet(false)}>
+          <Pressable style={styles.bmSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.bmHandle} />
+            <Text style={styles.bmSheetTitle}>Lưu địa điểm</Text>
+            {(['want', 'planned', 'done'] as BookmarkStatus[]).map((s) => (
+              <TouchableOpacity key={s} style={styles.bmItem} onPress={() => { if (id) setStatus(id, s); setShowBmSheet(false); }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="heart" size={18} color={BOOKMARK_ICON_COLOR[s]} />
+                  <Text style={[styles.bmItemText, bmStatus === s && { fontWeight: '700', color: colors.primary600 }]}>{BOOKMARK_LABEL[s]}</Text>
+                </View>
+                {bmStatus === s && <Ionicons name="checkmark" size={18} color={colors.primary600} />}
+              </TouchableOpacity>
+            ))}
+            {bmStatus && (
+              <TouchableOpacity style={[styles.bmItem, { borderBottomWidth: 0 }]} onPress={() => { if (id) setStatus(id, null); setShowBmSheet(false); }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="heart-dislike-outline" size={18} color={colors.textMuted} />
+                  <Text style={[styles.bmItemText, { color: colors.textMuted }]}>Bỏ lưu</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:          { flex: 1, backgroundColor: colors.bgScreen },
-  center:             { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  heroWrap:           { position: 'relative', height: 280 },
-  hero:               { width: '100%', height: 280, resizeMode: 'cover' },
-  heroOverlay:        { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.15)' },
-  backBtn:            { position: 'absolute', top: 48, left: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
-  infoSection:        { padding: spacing.lg, paddingBottom: 0 },
-  categoryRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.sm },
-  ratingPill:         { backgroundColor: colors.primary100, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  ratingText:         { fontSize: 12, color: colors.primary600, fontWeight: '500' },
-  title:              { fontSize: 22, fontWeight: '800', color: colors.textPrimary, lineHeight: 30, marginBottom: 6 },
-  location:           { fontSize: 14, color: colors.textMuted, marginBottom: spacing.md },
-  metaRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  metaItem:           { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText:           { fontSize: 13, color: colors.textMuted },
-  metaSep:            { width: 1, height: 16, backgroundColor: colors.border },
-  guideSection:       { marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
-  sectionTitle:       { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
-  guideRow:           { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  guideName:          { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  guideLabel:         { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  verifiedBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verifiedText:       { fontSize: 12, color: '#059669' },
-  section:            { marginHorizontal: spacing.lg, marginTop: spacing.lg },
-  description:        { fontSize: 14, color: colors.textPrimary, lineHeight: 22 },
-  tagsWrap:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  bottomBar:          { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bgCard, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, paddingBottom: 32, borderTopWidth: 1, borderTopColor: colors.border },
-  priceLabel:         { fontSize: 11, color: colors.textMuted },
-  priceValue:         { fontSize: 18, fontWeight: '800', color: colors.primary600 },
-  addBtn:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary600, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl },
-  addBtnText:         { color: colors.textOnDark, fontWeight: '700', fontSize: 15 },
+  container:    { flex: 1, backgroundColor: colors.bgScreen },
+  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Hero
+  heroWrap:         { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden', zIndex: 2 },
+  hero:             { width: '100%', height: 240, resizeMode: 'cover' },
+  heroPlaceholder:  { height: 240, backgroundColor: colors.border },
+  backBtn:          { position: 'absolute', top: 48, left: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  bmBtn:            { position: 'absolute', top: 48, right: spacing.lg, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+
+  // Body
+  body:         { padding: spacing.lg },
+  title:        { fontSize: 22, fontWeight: '800', color: colors.textPrimary, lineHeight: 30, marginBottom: 8 },
+  locationRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
+  locationText: { fontSize: 13, color: colors.textMuted },
+  tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  tag:          { backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  tagText:      { fontSize: 12, color: colors.textPrimary, fontWeight: '500' },
+  metaRow:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+  metaChip:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText:     { fontSize: 13, color: colors.textMuted },
+  metaDot:      { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.border },
+  hint:         { fontSize: 15, fontWeight: '700', color: colors.textPrimary, lineHeight: 22, marginBottom: 10 },
+  descWrap:     { marginBottom: 4 },
+  desc:         { fontSize: 14, color: colors.textMuted, lineHeight: 22 },
+  expandBtn:    { fontSize: 13, color: colors.secondary600, fontWeight: '600', marginTop: 6 },
+
+  // Accordions
+  accordion:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 18 },
+  accordionTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  accordionBody:  { paddingHorizontal: spacing.lg, paddingBottom: 16, gap: 10 },
+  accordionText:  { fontSize: 14, color: colors.textMuted, lineHeight: 20, flex: 1 },
+  contactRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  divider:        { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg },
+
+  // Bottom bar
+  bottomBar:    { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 10, backgroundColor: colors.bgCard, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, paddingBottom: 32, borderTopWidth: 1, borderTopColor: colors.border },
+  mapsBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.secondary600, paddingVertical: 13, borderRadius: radius.xl },
+  mapsBtnText:  { color: colors.textOnDark, fontWeight: '700', fontSize: 14 },
+  addBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.bgCard, paddingVertical: 13, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.primary600 },
+  addBtnText:   { color: colors.primary600, fontWeight: '700', fontSize: 14 },
+
   // Modal
-  modalOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet:         { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '90%' },
-  modalHandle:        { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.md },
-  modalHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle:         { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
-  expMini:            { flexDirection: 'row', gap: 10, backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
-  expMiniImg:         { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
-  expMiniTitle:       { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  expMiniLoc:         { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  errorBox:           { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
-  errorText:          { flex: 1, color: colors.error, fontSize: 12 },
-  stepLabel:          { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  noTrips:            { alignItems: 'center', paddingVertical: spacing.lg, gap: 8 },
-  noTripsText:        { fontSize: 14, color: colors.textMuted },
-  noTripsLink:        { fontSize: 14, color: colors.primary600, fontWeight: '600' },
-  tripOption:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 8, backgroundColor: colors.bgScreen },
-  tripOptionActive:   { borderColor: colors.primary600, backgroundColor: colors.primary100 },
-  tripOptionTitle:    { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  tripOptionTitleActive: { color: colors.primary600 },
-  tripOptionSub:      { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  dayChip:            { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  dayChipActive:      { backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  dayChipText:        { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  dayChipTextActive:  { color: colors.textOnDark },
-  slotRow:            { flexDirection: 'row', gap: 8 },
-  slotBtn:            { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  slotBtnActive:      { borderColor: colors.primary600, backgroundColor: colors.primary100 },
-  slotIcon:           { fontSize: 18, marginBottom: 4 },
-  slotLabel:          { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  slotLabelActive:    { color: colors.primary600 },
-  noteInput:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 60, backgroundColor: colors.bgScreen },
+  modalOverlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet:           { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '90%' },
+  modalHandle:          { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.md },
+  modalHeader:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  modalTitle:           { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  expMini:              { flexDirection: 'row', gap: 10, backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
+  expMiniImg:           { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
+  expMiniTitle:         { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  expMiniLoc:           { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  errorBox:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
+  errorText:            { flex: 1, color: colors.error, fontSize: 12 },
+  stepLabel:            { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  noTrips:              { alignItems: 'center', paddingVertical: spacing.lg, gap: 8 },
+  noTripsText:          { fontSize: 14, color: colors.textMuted },
+  noTripsLink:          { fontSize: 14, color: colors.primary600, fontWeight: '600' },
+  tripOption:           { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: 8, backgroundColor: colors.bgScreen },
+  tripOptionActive:     { borderColor: colors.primary600, backgroundColor: colors.primary100 },
+  tripOptionTitle:      { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  tripOptionTitleActive:{ color: colors.primary600 },
+  tripOptionSub:        { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  dayChip:              { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
+  dayChipActive:        { backgroundColor: colors.primary600, borderColor: colors.primary600 },
+  dayChipText:          { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  dayChipTextActive:    { color: colors.textOnDark },
+  slotRow:              { flexDirection: 'row', gap: 8 },
+  slotBtn:              { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
+  slotBtnActive:        { borderColor: colors.primary600, backgroundColor: colors.primary100 },
+  slotIcon:             { fontSize: 18, marginBottom: 4 },
+  slotLabel:            { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  slotLabelActive:      { color: colors.primary600 },
+  noteInput:            { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 60, backgroundColor: colors.bgScreen },
+
+  // Bookmark sheet
+  bmOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  bmSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: spacing.lg, paddingBottom: 32 },
+  bmHandle:     { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  bmSheetTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  bmItem:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  bmItemText:   { fontSize: 15, color: colors.textPrimary },
 });
