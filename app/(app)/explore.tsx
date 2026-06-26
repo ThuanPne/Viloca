@@ -107,23 +107,13 @@ function StoryItem({ story }: { story: Story }) {
 // ─── Image carousel ───────────────────────────────────────────────────────────
 
 function CarouselImage({ uri }: { uri: string }) {
-  const [loading, setLoading] = useState(true);
   return (
-    <View style={[s.postSingleImg, { width: SCREEN_W }]}>
-      <Image
-        source={{ uri }}
-        style={[s.postSingleImg, { width: SCREEN_W }]}
-        resizeMode="cover"
-        fadeDuration={0}
-        onLoadEnd={() => setLoading(false)}
-      />
-      {loading && (
-        <ActivityIndicator
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          color={colors.nomad.primary}
-        />
-      )}
-    </View>
+    <Image
+      source={{ uri }}
+      style={[s.postSingleImg, { width: SCREEN_W }]}
+      resizeMode="cover"
+      fadeDuration={200}
+    />
   );
 }
 
