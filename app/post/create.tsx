@@ -13,37 +13,57 @@ import { spacing, radius } from '@/src/theme/spacing';
 
 const MAX_IMAGES = 5;
 
+type ImageAsset = { uri: string; mimeType: string; ext: string; base64: string };
+
 export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
-  const [content, setContent]   = useState('');
-  const [images, setImages]     = useState<string[]>([]);
+  const [content, setContent]     = useState('');
+  const [images, setImages]       = useState<ImageAsset[]>([]);
   const [uploading, setUploading] = useState(false);
 
   async function pickImages() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      quality: 0.8,
+      quality: 0.85,
       selectionLimit: MAX_IMAGES - images.length,
+      base64: true,
     });
     if (!result.canceled) {
-      setImages((prev) => [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_IMAGES));
+      const assets: ImageAsset[] = result.assets.map((a) => {
+        const mime = a.mimeType ?? 'image/jpeg';
+        const ext  = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+        return { uri: a.uri, mimeType: mime === 'image/heic' ? 'image/jpeg' : mime, ext, base64: a.base64 ?? '' };
+      });
+      setImages((prev) => [...prev, ...assets].slice(0, MAX_IMAGES));
     }
   }
 
   function removeImage(uri: string) {
-    setImages((prev) => prev.filter((u) => u !== uri));
+    setImages((prev) => prev.filter((a) => a.uri !== uri));
   }
 
-  async function uploadImage(uri: string, userId: string): Promise<string | null> {
-    const filename = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const arrayBuffer = await fetch(uri).then((r) => r.arrayBuffer());
-    const { error } = await supabase.storage
-      .from('post-images')
-      .upload(filename, arrayBuffer, { contentType: 'image/jpeg', upsert: false });
-    if (error) return null;
-    const { data } = supabase.storage.from('post-images').getPublicUrl(filename);
-    return data.publicUrl;
+  function uploadImageXHR(asset: ImageAsset, filename: string, token: string): Promise<boolean> {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+    const anonKey    = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+    if (!asset.base64) return Promise.resolve(false);
+
+    const binary = atob(asset.base64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    return new Promise<boolean>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${supabaseUrl}/storage/v1/object/post-images/${filename}`, true);
+      xhr.setRequestHeader('apikey', anonKey);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Content-Type', asset.mimeType);
+      xhr.timeout = 30000;
+      xhr.onload    = () => { resolve(xhr.status < 300); };
+      xhr.onerror   = () => { console.error('[upload] network error'); resolve(false); };
+      xhr.ontimeout = () => { console.error('[upload] timeout');       resolve(false); };
+      xhr.send(bytes.buffer);
+    });
   }
 
   async function handleSubmit() {
@@ -53,11 +73,26 @@ export default function CreatePostScreen() {
       return;
     }
     setUploading(true);
+    let posted = false;
     try {
-      const uploadedUrls: string[] = [];
-      for (const uri of images) {
-        const url = await uploadImage(uri, user.id);
-        if (url) uploadedUrls.push(url);
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+      // Upload tất cả ảnh song song
+      const results = await Promise.all(
+        images.map((asset, i) => {
+          const filename = `${user.id}/${Date.now()}-${i}-${Math.random().toString(36).slice(2)}.${asset.ext}`;
+          return uploadImageXHR(asset, filename, token).then((ok) =>
+            ok ? `${supabaseUrl}/storage/v1/object/public/post-images/${filename}` : null
+          );
+        })
+      );
+      const uploadedUrls = results.filter((u): u is string => u !== null);
+
+      if (images.length > 0 && uploadedUrls.length === 0) {
+        Alert.alert('Lỗi upload ảnh', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+        return;
       }
 
       const { error } = await supabase.from('posts').insert({
@@ -69,11 +104,13 @@ export default function CreatePostScreen() {
       if (error) {
         Alert.alert('Lỗi', 'Không thể đăng bài. Vui lòng thử lại.');
       } else {
-        router.back();
+        posted = true;
       }
     } finally {
       setUploading(false);
     }
+    // Gọi sau finally để tránh state update cancel navigation
+    if (posted) router.back();
   }
 
   return (
@@ -111,10 +148,10 @@ export default function CreatePostScreen() {
         {/* Image previews */}
         {images.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageRow} contentContainerStyle={{ gap: 8 }}>
-            {images.map((uri) => (
-              <View key={uri} style={styles.imageWrap}>
-                <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
-                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(uri)}>
+            {images.map((asset) => (
+              <View key={asset.uri} style={styles.imageWrap}>
+                <Image source={{ uri: asset.uri }} style={styles.previewImage} resizeMode="cover" />
+                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(asset.uri)}>
                   <Ionicons name="close-circle" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>

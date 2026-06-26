@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, ScrollView, RefreshControl,
+  View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, Alert,
   Image, TouchableOpacity, Dimensions, Share, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -106,21 +106,48 @@ function StoryItem({ story }: { story: Story }) {
 
 // ─── Image carousel ───────────────────────────────────────────────────────────
 
-function ImageCarousel({ images }: { images: string[] }) {
+function CarouselImage({ uri }: { uri: string }) {
+  const [loading, setLoading] = useState(true);
+  return (
+    <View style={[s.postSingleImg, { width: SCREEN_W }]}>
+      <Image
+        source={{ uri }}
+        style={[s.postSingleImg, { width: SCREEN_W }]}
+        resizeMode="cover"
+        fadeDuration={0}
+        onLoadEnd={() => setLoading(false)}
+      />
+      {loading && (
+        <ActivityIndicator
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          color={colors.nomad.primary}
+        />
+      )}
+    </View>
+  );
+}
+
+function ImageCarousel({ images }: { images: string[] | null | undefined }) {
   const [idx, setIdx] = useState(0);
-  if (images.length === 0) return null;
-  if (images.length === 1) return <Image source={{ uri: images[0] }} style={s.postSingleImg} resizeMode="cover" />;
+  // Supabase đôi khi trả TEXT[] dạng string thô "{url1,url2}" — parse lại
+  const list: string[] = Array.isArray(images)
+    ? images
+    : typeof images === 'string' && (images as string).startsWith('{')
+      ? (images as string).slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+  if (list.length === 0) return null;
+  if (list.length === 1) return <CarouselImage uri={list[0]} />;
   return (
     <View>
       <FlatList
-        data={images}
+        data={list}
         keyExtractor={(_, i) => String(i)}
         horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
-        renderItem={({ item }) => <Image source={{ uri: item }} style={[s.postSingleImg, { width: SCREEN_W }]} resizeMode="cover" />}
+        renderItem={({ item }) => <CarouselImage uri={item} />}
       />
       <View style={s.carouselDots}>
-        {images.map((_, i) => <View key={i} style={[s.carouselDot, i === idx && s.carouselDotActive]} />)}
+        {list.map((_, i) => <View key={i} style={[s.carouselDot, i === idx && s.carouselDotActive]} />)}
       </View>
     </View>
   );
@@ -128,11 +155,32 @@ function ImageCarousel({ images }: { images: string[] }) {
 
 // ─── Post card ────────────────────────────────────────────────────────────────
 
-function PostCard({ post, currentUserId, onLike }: { post: Post; currentUserId?: string; onLike: (post: Post) => void }) {
+function PostCard({ post, currentUserId, onLike, onDelete }: {
+  post: Post;
+  currentUserId?: string;
+  onLike: (post: Post) => void;
+  onDelete: (postId: string) => void;
+}) {
   const [showFull, setShowFull] = useState(false);
-  const liked    = post.post_likes?.some((l) => l.user_id === currentUserId) ?? false;
-  const isMock   = post.id.startsWith('mock-');
+  const liked   = post.post_likes?.some((l) => l.user_id === currentUserId) ?? false;
+  const isMock  = post.id.startsWith('mock-');
+  const isOwn   = !isMock && post.user_id === currentUserId;
   const longText = (post.content?.length ?? 0) > 120;
+
+  function handleMenu() {
+    if (isMock) return;
+    if (isOwn) {
+      Alert.alert('Tùy chọn', undefined, [
+        { text: 'Xóa bài viết', style: 'destructive', onPress: () => {
+          Alert.alert('Xác nhận xóa', 'Bài viết sẽ bị xóa vĩnh viễn.', [
+            { text: 'Hủy', style: 'cancel' },
+            { text: 'Xóa', style: 'destructive', onPress: () => onDelete(post.id) },
+          ]);
+        }},
+        { text: 'Hủy', style: 'cancel' },
+      ]);
+    }
+  }
 
   return (
     <View style={s.postCard}>
@@ -149,9 +197,11 @@ function PostCard({ post, currentUserId, onLike }: { post: Post; currentUserId?:
           <Text style={s.postUserName}>{post.profiles?.full_name ?? 'Người dùng'}</Text>
           <Text style={s.postTime}>{timeAgo(post.created_at)}</Text>
         </View>
-        <TouchableOpacity style={{ padding: 4 }}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={colors.nomad.onSurfaceVariant} />
-        </TouchableOpacity>
+        {!isMock && (
+          <TouchableOpacity style={{ padding: 4 }} onPress={handleMenu}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.nomad.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
 
       {post.content ? (
@@ -263,6 +313,11 @@ export default function ExploreScreen() {
     }));
   }
 
+  async function handleDelete(postId: string) {
+    await supabase.from('posts').delete().eq('id', postId);
+    setRealPosts((prev) => prev.filter((p) => p.id !== postId));
+  }
+
   const ListHeader = (
     <>
       {/* Create post bar */}
@@ -326,7 +381,7 @@ export default function ExploreScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => <PostCard post={item} currentUserId={user?.id} onLike={handleLike} />}
+        renderItem={({ item }) => <PostCard post={item} currentUserId={user?.id} onLike={handleLike} onDelete={handleDelete} />}
         ItemSeparatorComponent={() => <View style={s.postDivider} />}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={colors.nomad.primary} /> : null}
         refreshControl={
