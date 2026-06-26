@@ -16,3 +16,6 @@ web-build/
 .idea/
 .cursor/
 .copilot/
+
+# Supabase
+supabase/.temp/

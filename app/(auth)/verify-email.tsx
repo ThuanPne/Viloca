@@ -1,21 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, TouchableOpacity,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Image, StyleSheet,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { colors } from '@/src/theme/colors';
+
+const c = colors.nomad;
 
 function mapOtpError(message: string): string {
-  if (/rate limit/i.test(message)) return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
-  if (/expired/i.test(message)) return 'Mã đã hết hạn. Vui lòng nhấn "Gửi lại mã".';
-  if (/invalid/i.test(message)) return 'Mã không đúng. Vui lòng kiểm tra lại.';
+  if (/rate limit/i.test(message))    return 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.';
+  if (/expired/i.test(message))       return 'Mã đã hết hạn. Vui lòng nhấn "Gửi lại mã".';
+  if (/invalid/i.test(message))       return 'Mã không đúng. Vui lòng kiểm tra lại.';
   if (/sending confirmation email|confirmation email/i.test(message)) return 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.';
   return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
@@ -23,11 +22,12 @@ function mapOtpError(message: string): string {
 const OTP_LENGTH = 6;
 
 export default function VerifyEmailScreen() {
+  const insets = useSafeAreaInsets();
   const { email, emailPending } = useLocalSearchParams<{ email: string; emailPending?: string }>();
-  const pending = emailPending === 'true';
+  const pending  = emailPending === 'true';
   const [otpValue, setOtpValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
   const [countdown, setCountdown] = useState(pending ? 0 : 60);
   const inputRef = useRef<TextInput>(null);
 
@@ -59,9 +59,7 @@ export default function VerifyEmailScreen() {
     setError('');
     const digits = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
     setOtpValue(digits);
-    if (digits.length === OTP_LENGTH) {
-      handleVerify(digits);
-    }
+    if (digits.length === OTP_LENGTH) handleVerify(digits);
   }
 
   async function handleResend() {
@@ -77,39 +75,42 @@ export default function VerifyEmailScreen() {
   const digits = otpValue.split('');
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View style={styles.screen}>
+      <View style={[styles.blob, styles.blobTopRight]} />
+      <View style={[styles.blob, styles.blobBottomLeft]} />
+
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-1 px-6 pt-4">
-          <TouchableOpacity
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 mb-8"
-            onPress={() => router.back()}
-          >
-            <Text className="text-gray-600 text-lg">←</Text>
+        <View style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 }]}>
+          {/* Back */}
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={20} color={c.onSurface} />
           </TouchableOpacity>
 
-          <View className="items-center mb-10">
-            <View className="w-16 h-16 bg-blue-500 rounded-2xl items-center justify-center mb-4">
-              <Text className="text-white text-3xl font-bold">V</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.logoWrap}>
+              <View style={styles.logoGlow} />
+              <Image source={require('@/assets/viloca-logo.png')} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text className="text-2xl font-bold text-gray-900">Xác nhận email</Text>
-            <Text className="text-gray-400 text-sm mt-2 text-center">
-              Nhập mã 6 số được gửi đến
-            </Text>
-            <Text className="text-blue-500 text-sm font-medium mt-0.5">{email}</Text>
+            <Text style={styles.headline}>Xác nhận email</Text>
+            <Text style={styles.subheadline}>Nhập mã 6 số được gửi đến</Text>
+            <Text style={styles.emailText}>{email}</Text>
           </View>
 
+          {/* Pending warning */}
           {pending ? (
-            <View className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-5">
-              <Text className="text-yellow-700 text-sm text-center">
+            <View style={styles.warningBanner}>
+              <Ionicons name="information-circle-outline" size={16} color="#92400E" />
+              <Text style={styles.warningText}>
                 Email có thể chưa đến. Nhấn "Gửi lại mã" để thử lại.
               </Text>
             </View>
           ) : null}
 
-          {/* Hidden input captures all typing/backspace natively */}
+          {/* Hidden input */}
           <TextInput
             ref={inputRef}
             value={otpValue}
@@ -120,68 +121,139 @@ export default function VerifyEmailScreen() {
             style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
           />
 
-          {/* Visual OTP boxes — tap to focus hidden input */}
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => inputRef.current?.focus()}
-          >
-            <View className="flex-row justify-center gap-3 mb-6">
+          {/* OTP boxes */}
+          <TouchableOpacity activeOpacity={1} onPress={() => inputRef.current?.focus()}>
+            <View style={styles.otpRow}>
               {Array.from({ length: OTP_LENGTH }).map((_, index) => {
-                const filled = digits[index] !== undefined;
-                const active = index === digits.length;
+                const filled  = digits[index] !== undefined;
+                const active  = index === digits.length;
                 return (
                   <View
                     key={index}
-                    className={`w-12 h-14 border-2 rounded-xl items-center justify-center ${
-                      active ? 'border-blue-500 bg-blue-50' :
-                      filled ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
-                    }`}
+                    style={[
+                      styles.otpBox,
+                      (filled || active) ? styles.otpBoxActive : styles.otpBoxEmpty,
+                    ]}
                   >
-                    <Text className="text-xl font-bold text-gray-900">
-                      {digits[index] ?? ''}
-                    </Text>
+                    <Text style={styles.otpDigit}>{digits[index] ?? ''}</Text>
                   </View>
                 );
               })}
             </View>
           </TouchableOpacity>
 
+          {/* Error */}
           {error ? (
-            <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5">
-              <Text className="text-red-600 text-sm text-center">{error}</Text>
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle-outline" size={16} color={c.primary} />
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
+          {/* Confirm button */}
           <TouchableOpacity
-            className={`py-4 rounded-2xl items-center mb-6 ${
-              otpValue.length === OTP_LENGTH && !loading ? 'bg-blue-500' : 'bg-blue-200'
-            }`}
+            style={[styles.primaryBtn, (otpValue.length < OTP_LENGTH || loading) && styles.primaryBtnDisabled]}
             onPress={() => handleVerify(otpValue)}
             disabled={otpValue.length < OTP_LENGTH || loading}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.onPrimary} />
             ) : (
-              <Text className="text-white font-semibold text-base">Xác nhận</Text>
+              <>
+                <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                <Ionicons name="checkmark" size={18} color={c.onPrimary} />
+              </>
             )}
           </TouchableOpacity>
 
-          <View className="items-center gap-2">
-            <Text className="text-gray-400 text-sm">Chưa nhận được mã?</Text>
+          {/* Resend */}
+          <View style={styles.resendWrap}>
+            <Text style={styles.resendLabel}>Chưa nhận được mã?</Text>
             {countdown > 0 ? (
-              <Text className="text-gray-400 text-sm">
-                Gửi lại sau{' '}
-                <Text className="text-blue-500 font-medium">{countdown}s</Text>
+              <Text style={styles.countdownText}>
+                Gửi lại sau <Text style={styles.countdownNum}>{countdown}s</Text>
               </Text>
             ) : (
-              <TouchableOpacity onPress={handleResend}>
-                <Text className="text-blue-500 font-semibold text-sm">Gửi lại mã</Text>
+              <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
+                <Text style={styles.resendLink}>Gửi lại mã</Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.background },
+
+  blob: { position: 'absolute', borderRadius: 9999, pointerEvents: 'none' },
+  blobTopRight: {
+    width: '70%', height: '35%', top: '-8%', right: '-15%',
+    backgroundColor: c.secondaryContainer, opacity: 0.18,
+  },
+  blobBottomLeft: {
+    width: '55%', height: '28%', bottom: '-5%', left: '-12%',
+    backgroundColor: c.onPrimaryContainer, opacity: 0.10,
+  },
+
+  container: { flex: 1, paddingHorizontal: 20 },
+
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: c.surfaceContainer,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 24,
+  },
+
+  header: { alignItems: 'center', marginBottom: 32 },
+  logoWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  logoGlow: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    backgroundColor: c.primary, opacity: 0.1, transform: [{ scale: 1.3 }],
+  },
+  logo: { width: 80, height: 80 },
+  headline: { fontSize: 26, fontWeight: '700', color: c.primary, letterSpacing: -0.5, marginBottom: 8 },
+  subheadline: { fontSize: 14, color: c.onSurfaceVariant, textAlign: 'center' },
+  emailText: { fontSize: 14, fontWeight: '600', color: c.primary, marginTop: 4 },
+
+  warningBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 20,
+  },
+  warningText: { flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 },
+
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 24 },
+  otpBox: {
+    width: 48, height: 56, borderRadius: 12, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  otpBoxEmpty:  { borderColor: c.outlineVariant, backgroundColor: c.surfaceContainerLow },
+  otpBoxActive: { borderColor: c.primary, backgroundColor: c.onPrimaryContainer },
+  otpDigit: { fontSize: 22, fontWeight: '700', color: c.onSurface },
+
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: c.onPrimaryContainer, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16,
+  },
+  errorText: { flex: 1, fontSize: 14, color: c.primary },
+
+  primaryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: c.primary, borderRadius: 12, paddingVertical: 16,
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 4,
+    marginBottom: 24,
+  },
+  primaryBtnDisabled: { opacity: 0.5, shadowOpacity: 0 },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: c.onPrimary },
+
+  resendWrap: { alignItems: 'center', gap: 8 },
+  resendLabel: { fontSize: 14, color: c.onSurfaceVariant },
+  countdownText: { fontSize: 14, color: c.onSurfaceVariant },
+  countdownNum: { fontWeight: '600', color: c.primary },
+  resendLink: { fontSize: 14, fontWeight: '700', color: c.primary },
+});

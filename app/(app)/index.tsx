@@ -1,171 +1,291 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList,
-  Image, TouchableOpacity, TextInput,
+  View, Text, FlatList, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, Image,
 } from 'react-native';
-import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
-import { useExperiences } from '@/src/hooks/useExperiences';
-import { ScreenWrapper } from '@/src/components/ui/ScreenWrapper';
-import { SectionHeader } from '@/src/components/ui/SectionHeader';
-import { Tag } from '@/src/components/ui/Tag';
-import { Badge } from '@/src/components/ui/Badge';
-import { Avatar } from '@/src/components/ui/Avatar';
 import { colors } from '@/src/theme/colors';
-import { spacing, radius } from '@/src/theme/spacing';
-import type { Experience, ExperienceCategory } from '@/src/types';
+import { useFestivals } from '@/src/hooks/useFestivals';
+import { useLocations } from '@/src/hooks/useLocations';
+import { FilterSheet, FilterTab } from '@/src/components/home/FilterSheet';
+import type { FestivalWithStatus } from '@/src/hooks/useFestivals';
+import type { Location } from '@/src/types';
 
-const CATEGORIES: { label: string; value: ExperienceCategory | null }[] = [
-  { label: 'Tất cả', value: null },
-  { label: 'Ẩm thực', value: 'food_tour' },
-  { label: 'Văn hóa', value: 'cultural' },
-  { label: 'Thiên nhiên', value: 'trekking' },
-  { label: 'Workshop', value: 'workshop' },
+// ─── Category chips (Nhóm địa điểm — simplified as chips) ───────────────────
+const CATEGORY_CHIPS = [
+  { label: 'Di tích',    value: 'Di tích' },
+  { label: 'Ẩm thực',   value: 'Ẩm thực' },
+  { label: 'Nghệ thuật', value: 'Nghệ thuật' },
+  { label: 'Thiên nhiên', value: 'Thiên nhiên' },
+  { label: 'Kiến trúc', value: 'Kiến trúc' },
 ];
 
-const CATEGORY_LABEL: Record<string, string> = {
-  food_tour: 'Ẩm thực',
-  workshop:  'Workshop',
-  trekking:  'Thiên nhiên',
-  cultural:  'Văn hóa',
-};
-
-function formatPrice(price: number) {
-  return price.toLocaleString('vi-VN') + 'đ';
+// ─── Festival badge ──────────────────────────────────────────────────────────
+function festivalBadge(f: FestivalWithStatus) {
+  if (f.displayStatus === 'coming_soon') return 'Coming Soon';
+  if (f.displayStatus === 'days_away')   return `${f.daysAway} ngày nữa`;
+  return `${f.monthsAway} tháng nữa`;
 }
 
-export default function HomeScreen() {
-  const user = useAuthStore((s) => s.user);
-  const [activeCategory, setActiveCategory] = useState<ExperienceCategory | null>(null);
-  const { experiences, featured } = useExperiences(activeCategory);
+// ─── Tall festival card (4:5 aspect) ────────────────────────────────────────
+function TallFestivalCard({ festival }: { festival: FestivalWithStatus }) {
+  return (
+    <TouchableOpacity style={styles.tallCard} activeOpacity={0.9}>
+      <Image
+        source={{ uri: festival.cover_image ?? undefined }}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.75)']}
+        locations={[0.4, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Badge top-left */}
+      <View style={styles.tallBadge}>
+        <Text style={styles.tallBadgeText}>{festivalBadge(festival)}</Text>
+      </View>
+      {/* Info bottom */}
+      <View style={styles.tallInfo}>
+        <Text style={styles.tallTitle} numberOfLines={2}>{festival.name}</Text>
+        <Text style={styles.tallSub}>📍 {festival.location}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
+// ─── Square place card (text below) ─────────────────────────────────────────
+function SquarePlaceCard({ location }: { location: Location }) {
+  const firstPhoto = location.photos?.split(',')[0]?.trim();
+  const subtitle = [location.district, location.city].filter(Boolean).join(', ');
+  return (
+    <TouchableOpacity
+      style={styles.squareCard}
+      activeOpacity={0.88}
+      onPress={() => router.push(`/location/${location.id}`)}
+    >
+      <Image
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={styles.squareImage}
+        resizeMode="cover"
+      />
+      <Text style={styles.squareName} numberOfLines={1}>{location.name}</Text>
+      <Text style={styles.squareSub}>
+        <Ionicons name="location-outline" size={10} color={colors.nomad.onSurfaceVariant} />
+        {' '}{subtitle || 'Việt Nam'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
+export default function HomeScreen() {
+  const insets   = useSafeAreaInsets();
+  const user     = useAuthStore((s) => s.user);
   const firstName = user?.user_metadata?.full_name?.split(' ').pop() ?? 'bạn';
 
-  return (
-    <ScreenWrapper>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Avatar name={user?.user_metadata?.full_name} size={36} />
-            <Text style={styles.greeting}>Xin chào, <Text style={styles.greetingName}>{firstName}</Text></Text>
-          </View>
-          <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
-        </View>
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [sheetVisible, setSheetVisible]     = useState(false);
+  const [sheetTab, setSheetTab]             = useState<FilterTab>('hashtag');
 
-        {/* Search Bar */}
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Bạn muốn khám phá điều gì?"
-            placeholderTextColor={colors.textMuted}
-            editable={false}
+  const { festivals,  loading: festivalsLoading } = useFestivals();
+  const { locations, loading: locationsLoading }  = useLocations(6, activeCategory);
+
+  function openFilter(tab: FilterTab) {
+    setSheetTab(tab);
+    setSheetVisible(true);
+  }
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+
+      {/* ── Fixed blur header ──────────────────────────────────────── */}
+      <BlurView intensity={80} tint="light" style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('@/assets/viloca-logo.png')}
+            style={styles.logoImg}
+            resizeMode="contain"
           />
         </View>
+        <TouchableOpacity style={styles.headerIcon}>
+          <Ionicons name="notifications-outline" size={24} color={colors.nomad.onSurface} />
+        </TouchableOpacity>
+      </BlurView>
 
-        {/* Category Filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 8 }}>
-          {CATEGORIES.map((cat) => {
-            const active = activeCategory === cat.value;
+      {/* ── Scrollable content ─────────────────────────────────────── */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 64, paddingBottom: 32 }}
+      >
+        {/* Greeting */}
+        <View style={styles.heroSection}>
+          <Text style={styles.greeting}>Xin chào, {firstName}!</Text>
+          <Text style={styles.tagline}>where to next?</Text>
+        </View>
+
+        {/* Search bar */}
+        <TouchableOpacity style={styles.searchBar} activeOpacity={0.85} onPress={() => router.push('/search')}>
+          <Ionicons name="search-outline" size={18} color={colors.nomad.primary} />
+          <Text style={styles.searchPlaceholder}>Tìm địa điểm...</Text>
+          <TouchableOpacity onPress={() => openFilter('hashtag')} style={styles.filterIcon}>
+            <Ionicons name="options-outline" size={18} color={colors.nomad.onSurfaceVariant} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+
+        {/* Category chips (Nhóm địa điểm) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsScroll}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+        >
+          {CATEGORY_CHIPS.map((chip) => {
+            const active = activeCategory === chip.value;
             return (
               <TouchableOpacity
-                key={cat.label}
+                key={chip.value}
                 style={[styles.categoryChip, active && styles.categoryChipActive]}
-                onPress={() => setActiveCategory(cat.value)}
+                onPress={() => setActiveCategory(active ? null : chip.value)}
               >
-                <Text style={[styles.categoryText, active && styles.categoryTextActive]}>{cat.label}</Text>
+                <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                  {chip.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {/* Featured */}
-        {!activeCategory && (
-          <View style={{ marginTop: spacing.lg }}>
-            <View style={styles.sectionHeader}>
-              <SectionHeader title="Đang nổi bật" />
-            </View>
-            <FlatList
-              horizontal
-              data={featured}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 12 }}
-              renderItem={({ item }) => <FeaturedCard item={item} />}
-            />
+        {/* ── Sự kiện sắp diễn ra ──────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Sự kiện sắp diễn ra</Text>
+          <Text style={styles.seeAll}>Xem tất cả</Text>
+        </View>
+
+        {festivalsLoading ? (
+          <ActivityIndicator color={colors.nomad.primary} style={{ marginVertical: 32 }} />
+        ) : festivals.length === 0 ? (
+          <Text style={styles.emptyText}>Không có sự kiện nào trong thời gian tới</Text>
+        ) : (
+          <View style={styles.tallCards}>
+            {festivals.slice(0, 3).map((f) => (
+              <TallFestivalCard key={f.id} festival={f} />
+            ))}
           </View>
         )}
 
-        {/* Experience List */}
-        <View style={{ marginTop: spacing.xl, paddingHorizontal: spacing.lg }}>
-          <SectionHeader title="Trải nghiệm gợi ý" />
-          {experiences.map((item) => (
-            <ExperienceRow key={item.id} item={item} />
-          ))}
+        {/* ── Địa điểm nổi bật ─────────────────────────────────────── */}
+        <View style={[styles.sectionHeader, { marginTop: 32 }]}>
+          <Text style={styles.sectionTitle}>Địa điểm nổi bật</Text>
         </View>
+
+        {locationsLoading ? (
+          <ActivityIndicator color={colors.nomad.primary} style={{ marginVertical: 24 }} />
+        ) : locations.length === 0 ? (
+          <Text style={styles.emptyText}>Không có địa điểm nào</Text>
+        ) : (
+          <FlatList
+            horizontal
+            data={locations}
+            keyExtractor={(l) => l.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+            renderItem={({ item }) => <SquarePlaceCard location={item} />}
+          />
+        )}
       </ScrollView>
-    </ScreenWrapper>
+
+      {/* Filter sheet */}
+      <FilterSheet
+        visible={sheetVisible}
+        initialTab={sheetTab}
+        onClose={() => setSheetVisible(false)}
+      />
+    </View>
   );
 }
 
-function FeaturedCard({ item }: { item: Experience }) {
-  return (
-    <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9} onPress={() => router.push(`/experience/${item.id}`)}>
-      <Image source={{ uri: item.coverImage }} style={styles.featuredImage} />
-      <View style={styles.featuredOverlay}>
-        <Badge label={CATEGORY_LABEL[item.category] ?? item.category} color="primary" />
-        <View style={{ marginTop: 'auto' }}>
-          <Text style={styles.featuredTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.featuredLocation}>📍 {item.location}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function ExperienceRow({ item }: { item: Experience }) {
-  return (
-    <TouchableOpacity style={styles.row} activeOpacity={0.85} onPress={() => router.push(`/experience/${item.id}`)}>
-      <Image source={{ uri: item.coverImage }} style={styles.rowImage} />
-      <View style={styles.rowInfo}>
-        <Tag label={CATEGORY_LABEL[item.category] ?? item.category} color="forest" />
-        <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.rowLocation} numberOfLines={1}>📍 {item.location}</Text>
-        <View style={styles.rowMeta}>
-          <Text style={styles.rowRating}>⭐ {item.rating}</Text>
-          <Text style={styles.rowPrice}>{formatPrice(item.price)}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
-  headerLeft:        { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  greeting:          { fontSize: 15, color: colors.textMuted },
-  greetingName:      { fontWeight: '600', color: colors.textPrimary },
-  searchBar:         { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 12, gap: 8 },
-  searchInput:       { flex: 1, fontSize: 14, color: colors.textPrimary },
-  categories:        { marginTop: spacing.md },
-  categoryChip:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.primary100 },
-  categoryChipActive:{ backgroundColor: colors.primary600 },
-  categoryText:      { fontSize: 13, fontWeight: '500', color: colors.primary600 },
-  categoryTextActive:{ color: colors.textOnDark },
-  sectionHeader:     { paddingHorizontal: spacing.lg },
-  featuredCard:      { width: 260, height: 180, borderRadius: radius.lg, overflow: 'hidden' },
-  featuredImage:     { width: '100%', height: '100%', resizeMode: 'cover' },
-  featuredOverlay:   { ...StyleSheet.absoluteFillObject, padding: 12, justifyContent: 'flex-start', backgroundColor: 'rgba(0,0,0,0.25)' },
-  featuredTitle:     { color: colors.textOnDark, fontWeight: '700', fontSize: 15, marginBottom: 4 },
-  featuredLocation:  { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  row:               { flexDirection: 'row', backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: spacing.md, gap: 12 },
-  rowImage:          { width: 80, height: 80, borderRadius: radius.md, resizeMode: 'cover' },
-  rowInfo:           { flex: 1, gap: 4 },
-  rowTitle:          { fontSize: 14, fontWeight: '600', color: colors.textPrimary, lineHeight: 20 },
-  rowLocation:       { fontSize: 12, color: colors.textMuted },
-  rowMeta:           { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  rowRating:         { fontSize: 12, color: colors.textMuted },
-  rowPrice:          { fontSize: 13, fontWeight: '600', color: colors.primary600 },
+  screen: { flex: 1, backgroundColor: colors.nomad.background },
+
+  // Header
+  header: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.nomad.outlineVariant,
+  },
+  headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoImg:     { width: 44, height: 44 },
+  headerIcon:  { padding: 4 },
+
+  // Hero
+  heroSection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  greeting:    { fontSize: 28, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 36 },
+  tagline:     { fontSize: 28, fontWeight: '700', color: colors.nomad.primaryContainer, lineHeight: 36 },
+
+  // Search
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 20, marginBottom: 16,
+    backgroundColor: colors.nomad.surfaceContainerLow,
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,
+    shadowColor: colors.nomad.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 2,
+  },
+  searchPlaceholder: { flex: 1, fontSize: 15, color: colors.nomad.outline },
+  filterIcon:        { padding: 2 },
+
+  // Category chips
+  chipsScroll: { marginBottom: 24 },
+  categoryChip: {
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 99,
+    backgroundColor: colors.nomad.surfaceContainer,
+  },
+  categoryChipActive: { backgroundColor: colors.nomad.secondaryContainer },
+  categoryChipText:   { fontSize: 12, fontWeight: '600', color: colors.nomad.onSurfaceVariant, letterSpacing: 0.3 },
+  categoryChipTextActive: { color: colors.nomad.onSurface },
+
+  // Section headers
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, marginBottom: 16,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.nomad.onSurface },
+  seeAll:       { fontSize: 12, fontWeight: '600', color: colors.nomad.primary },
+
+  // Tall festival cards (4:5 ratio, stacked vertically)
+  tallCards:  { paddingHorizontal: 20, gap: 20 },
+  tallCard: {
+    width: '100%', aspectRatio: 4 / 5,
+    borderRadius: 28, overflow: 'hidden',
+    shadowColor: colors.nomad.primary,
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.12, shadowRadius: 48, elevation: 6,
+  },
+  tallBadge: {
+    position: 'absolute', top: 20, left: 20,
+    backgroundColor: colors.nomad.primary,
+    borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  tallBadgeText: { fontSize: 12, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  tallInfo:  { position: 'absolute', bottom: 24, left: 24, right: 24 },
+  tallTitle: { fontSize: 24, fontWeight: '700', color: '#fff', lineHeight: 32, marginBottom: 4 },
+  tallSub:   { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+
+  // Square place cards
+  squareCard:  { width: 180 },
+  squareImage: { width: 180, height: 180, borderRadius: 16, marginBottom: 8 },
+  squareName:  { fontSize: 15, fontWeight: '600', color: colors.nomad.onSurface, marginBottom: 2 },
+  squareSub:   { fontSize: 11, color: colors.nomad.onSurfaceVariant },
+
+  emptyText: { paddingHorizontal: 20, fontSize: 13, color: colors.nomad.onSurfaceVariant },
 });

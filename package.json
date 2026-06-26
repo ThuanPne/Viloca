@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/metro-runtime": "~56.0.15",
     "@expo/vector-icons": "^15.1.1",
     "@gorhom/bottom-sheet": "^5.2.14",
@@ -11,6 +13,7 @@
     "babel-preset-expo": "^56.0.15",
     "expo": "~56.0.12",
     "expo-auth-session": "~56.0.14",
+    "expo-blur": "~56.0.3",
     "expo-constants": "~56.0.18",
     "expo-image-picker": "~56.0.18",
     "expo-linear-gradient": "~56.0.4",

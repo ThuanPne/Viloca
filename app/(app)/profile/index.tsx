@@ -64,7 +64,7 @@ export default function ProfileScreen() {
             style={styles.editBtn}
             onPress={() => router.push('/(app)/profile/edit')}
           >
-            <Ionicons name="pencil-outline" size={14} color={colors.primary600} />
+            <Ionicons name="pencil-outline" size={14} color={colors.nomad.primary} />
             <Text style={styles.editText}>Chỉnh sửa hồ sơ</Text>
           </TouchableOpacity>
         </View>
@@ -93,11 +93,11 @@ export default function ProfileScreen() {
             >
               <View style={styles.menuLeft}>
                 <View style={styles.menuIcon}>
-                  <Ionicons name={item.icon as any} size={18} color={colors.primary600} />
+                  <Ionicons name={item.icon as any} size={18} color={colors.nomad.primary} />
                 </View>
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.border} />
+              <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
             </TouchableOpacity>
           ))}
         </View>
@@ -114,22 +114,23 @@ export default function ProfileScreen() {
   );
 }
 
+const n = colors.nomad;
 const styles = StyleSheet.create({
   hero:          { alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
-  name:          { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: 12 },
-  email:         { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
-  editText:      { fontSize: 13, fontWeight: '500', color: colors.primary600 },
-  statsRow:      { flexDirection: 'row', marginHorizontal: spacing.lg, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  name:          { fontSize: 22, fontWeight: '700', color: n.onSurface, marginTop: 12 },
+  email:         { fontSize: 13, color: n.onSurfaceVariant, marginTop: 2 },
+  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: n.primary, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
+  editText:      { fontSize: 13, fontWeight: '500', color: n.primary },
+  statsRow:      { flexDirection: 'row', marginHorizontal: spacing.lg, backgroundColor: n.surfaceContainer, borderRadius: radius.lg, borderWidth: 1, borderColor: n.outlineVariant, padding: spacing.md },
   statItem:      { flex: 1, alignItems: 'center' },
-  statValue:     { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  statLabel:     { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  menuSection:   { marginTop: spacing.lg, marginHorizontal: spacing.lg, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  statValue:     { fontSize: 20, fontWeight: '700', color: n.onSurface },
+  statLabel:     { fontSize: 11, color: n.onSurfaceVariant, marginTop: 2 },
+  menuSection:   { marginTop: spacing.lg, marginHorizontal: spacing.lg, backgroundColor: n.surfaceContainer, borderRadius: radius.lg, borderWidth: 1, borderColor: n.outlineVariant },
   menuRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: spacing.md },
-  menuBorder:    { borderTopWidth: 1, borderTopColor: colors.border },
+  menuBorder:    { borderTopWidth: 1, borderTopColor: n.outlineVariant },
   menuLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  menuIcon:      { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:     { fontSize: 14, color: colors.textPrimary },
+  menuIcon:      { width: 32, height: 32, borderRadius: 8, backgroundColor: n.onPrimaryContainer, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:     { fontSize: 14, color: n.onSurface },
   signOutSection:{ margin: spacing.lg },
   signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 14, borderRadius: radius.lg },
   signOutText:   { fontSize: 15, fontWeight: '600', color: colors.error },

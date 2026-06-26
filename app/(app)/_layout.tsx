@@ -15,8 +15,8 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Khám phá',
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" size={size} color={color} />,
+          title: 'Trang Chủ',
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
