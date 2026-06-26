@@ -287,7 +287,7 @@ export default function TripDetailScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary600} />
+        <ActivityIndicator size="large" color={colors.nomad.primary} />
       </View>
     );
   }
@@ -359,27 +359,19 @@ export default function TripDetailScreen() {
         {tab === 'timeline' && (
           <View style={{ paddingBottom: 100 }}>
 
-            {/* Freemium banner for AI trips */}
-            {trip.is_ai_generated && items.length > 0 && (
-              <View style={styles.freemiumBanner}>
-                <Ionicons name="lock-closed-outline" size={14} color={colors.primary600} />
-                <Text style={styles.freemiumBannerText}>Nâng cấp Premium để xem đầy đủ thông tin địa điểm</Text>
-              </View>
-            )}
-
             {/* Setup card — hiện khi chưa có ngày đi */}
             {!trip.start_date && (
               <TouchableOpacity style={styles.setupCard} activeOpacity={0.85} onPress={() => { setSetupStart(''); setSetupEnd(''); setShowDateModal(true); }}>
                 <View style={styles.setupCardLeft}>
                   <View style={styles.setupCardIcon}>
-                    <Ionicons name="calendar-outline" size={20} color={colors.primary600} />
+                    <Ionicons name="calendar-outline" size={20} color={colors.nomad.primary} />
                   </View>
                   <View>
                     <Text style={styles.setupCardTitle}>Thêm ngày đi</Text>
                     <Text style={styles.setupCardSub}>Để xem timeline theo từng ngày</Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.primary600} />
+                <Ionicons name="chevron-forward" size={18} color={colors.nomad.primary} />
               </TouchableOpacity>
             )}
 
@@ -388,7 +380,7 @@ export default function TripDetailScreen() {
               <View style={styles.aiBanner}>
                 <View style={styles.aiBannerTop}>
                   <View style={styles.aiBannerTitleRow}>
-                    <Ionicons name="sparkles-outline" size={16} color={colors.primary600} />
+                    <Ionicons name="sparkles-outline" size={16} color={colors.nomad.primary} />
                     <Text style={styles.aiBannerTitle}>AI gợi ý lịch trình cho bạn</Text>
                   </View>
                   <TouchableOpacity onPress={() => setDismissedAI(true)}>
@@ -425,14 +417,14 @@ export default function TripDetailScreen() {
                     style={styles.stepperBtn}
                     onPress={() => setAiDays((d) => Math.max(1, d - 1))}
                   >
-                    <Ionicons name="remove" size={18} color={colors.primary600} />
+                    <Ionicons name="remove" size={18} color={colors.nomad.primary} />
                   </TouchableOpacity>
                   <Text style={styles.stepperValue}>{aiDays} ngày</Text>
                   <TouchableOpacity
                     style={styles.stepperBtn}
                     onPress={() => setAiDays((d) => Math.min(14, d + 1))}
                   >
-                    <Ionicons name="add" size={18} color={colors.primary600} />
+                    <Ionicons name="add" size={18} color={colors.nomad.primary} />
                   </TouchableOpacity>
                 </View>
                 {aiLog ? <Text style={styles.aiLogText}>{aiLog}</Text> : null}
@@ -456,7 +448,7 @@ export default function TripDetailScreen() {
                 <Text style={styles.emptyTitle}>Chưa có địa điểm nào</Text>
                 <Text style={styles.emptyBody}>Tự thêm địa điểm hoặc để AI gợi ý lịch trình phù hợp với bạn</Text>
                 <TouchableOpacity style={styles.aiSuggestBtn} onPress={() => setDismissedAI(false)}>
-                  <Ionicons name="sparkles-outline" size={18} color={colors.primary600} />
+                  <Ionicons name="sparkles-outline" size={18} color={colors.nomad.primary} />
                   <Text style={styles.aiSuggestText}>AI gợi ý lịch trình</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.addInlineBtn} onPress={openAddExp}>
@@ -486,7 +478,7 @@ export default function TripDetailScreen() {
                           onPress={() => { setAddDay(dayNum); openAddExp(); }}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <Ionicons name="add" size={14} color={colors.primary600} />
+                          <Ionicons name="add" size={14} color={colors.nomad.primary} />
                           <Text style={styles.dayAddText}>Thêm</Text>
                         </TouchableOpacity>
                         <Ionicons
@@ -547,7 +539,7 @@ export default function TripDetailScreen() {
                                     </Text>
                                     {isAIItem && (
                                       <View style={styles.aiItemBadge}>
-                                        <Ionicons name="sparkles" size={9} color={colors.primary600} />
+                                        <Ionicons name="sparkles" size={9} color={colors.nomad.primary} />
                                         <Text style={styles.aiItemBadgeText}>AI</Text>
                                       </View>
                                     )}
@@ -942,15 +934,15 @@ const styles = StyleSheet.create({
   dates:              { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   tabs:               { flexDirection: 'row', backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBtn:             { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabBtnActive:       { borderBottomWidth: 2, borderBottomColor: colors.primary600 },
+  tabBtnActive:       { borderBottomWidth: 2, borderBottomColor: colors.nomad.primary },
   tabText:            { fontSize: 13, fontWeight: '500', color: colors.textMuted },
-  tabTextActive:      { color: colors.primary600, fontWeight: '600' },
+  tabTextActive:      { color: colors.nomad.primary, fontWeight: '600' },
   // Setup card
-  setupCard:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primary100, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.primary600 + '40' },
+  setupCard:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#e8f0d8', borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
   setupCardLeft:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   setupCardIcon:    { width: 40, height: 40, borderRadius: radius.lg, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  setupCardTitle:   { fontSize: 14, fontWeight: '700', color: colors.primary600 },
-  setupCardSub:     { fontSize: 12, color: colors.primary600 + 'aa', marginTop: 2 },
+  setupCardTitle:   { fontSize: 14, fontWeight: '700', color: colors.nomad.primary },
+  setupCardSub:     { fontSize: 12, color: colors.nomad.primary + 'aa', marginTop: 2 },
   // AI banner
   aiBanner:         { backgroundColor: colors.bgCard, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
   aiBannerTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
@@ -959,21 +951,21 @@ const styles = StyleSheet.create({
   aiBannerSub:      { fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
   vibesRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md },
   vibeChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  vibeChipActive:   { borderColor: colors.primary600, backgroundColor: colors.primary100 },
+  vibeChipActive:   { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
   vibeChipText:     { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  vibeChipTextActive: { color: colors.primary600, fontWeight: '700' },
+  vibeChipTextActive: { color: colors.nomad.primary, fontWeight: '700' },
   stepperRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.sm },
-  stepperBtn:       { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.primary600, alignItems: 'center', justifyContent: 'center' },
+  stepperBtn:       { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
   stepperValue:     { fontSize: 15, fontWeight: '600', color: colors.text, minWidth: 56, textAlign: 'center' },
-  aiLogText:        { fontSize: 12, color: colors.primary600, marginTop: 8 },
-  aiBannerBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.primary600, paddingVertical: 10, borderRadius: radius.lg },
+  aiLogText:        { fontSize: 12, color: colors.nomad.primary, marginTop: 8 },
+  aiBannerBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingVertical: 10, borderRadius: radius.lg },
   aiBannerBtnText:  { color: colors.textOnDark, fontWeight: '600', fontSize: 13 },
   // Detail modal
   detailImg:          { width: '100%', height: 200, borderRadius: radius.lg, resizeMode: 'cover', marginBottom: spacing.md },
   detailImgPlaceholder: { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   detailBody:         { paddingBottom: spacing.lg },
-  detailCatBadge:     { alignSelf: 'flex-start', backgroundColor: colors.primary100, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginBottom: 8 },
-  detailCatText:      { fontSize: 11, fontWeight: '600', color: colors.primary600 },
+  detailCatBadge:     { alignSelf: 'flex-start', backgroundColor: '#e8f0d8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginBottom: 8 },
+  detailCatText:      { fontSize: 11, fontWeight: '600', color: colors.nomad.primary },
   detailTitle:        { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.sm },
   detailRow:          { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   detailRowText:      { fontSize: 13, color: colors.textMuted },
@@ -983,7 +975,7 @@ const styles = StyleSheet.create({
   detailActions:      { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
   detailDeleteBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.error, paddingVertical: 12, borderRadius: radius.lg },
   detailDeleteText:   { fontSize: 13, fontWeight: '600', color: colors.error },
-  detailCloseBtn:     { flex: 1, backgroundColor: colors.primary600, paddingVertical: 12, borderRadius: radius.lg, alignItems: 'center' },
+  detailCloseBtn:     { flex: 1, backgroundColor: colors.nomad.primary, paddingVertical: 12, borderRadius: radius.lg, alignItems: 'center' },
   detailCloseBtnText: { fontSize: 13, fontWeight: '600', color: colors.textOnDark },
   // Date setup modal
   dateSetupLabel:   { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: spacing.sm },
@@ -991,27 +983,27 @@ const styles = StyleSheet.create({
   emptyWrap:          { alignItems: 'center', paddingTop: 60, paddingBottom: 40, paddingHorizontal: spacing.xl },
   emptyTitle:         { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' },
   emptyBody:          { fontSize: 14, color: colors.textMuted, marginTop: spacing.sm, textAlign: 'center', lineHeight: 22 },
-  addInlineBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary600, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
+  addInlineBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
   addInlineBtnText:   { color: colors.textOnDark, fontWeight: '700', fontSize: 14 },
   // FAB
-  fab:                { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fab:                { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
   // Day group
   dayGroup:              { marginBottom: spacing.xl },
   dayGroupHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  dayPill:               { backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.full },
+  dayPill:               { backgroundColor: colors.nomad.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.full },
   dayPillText:           { fontSize: 12, fontWeight: '700', color: colors.textOnDark },
-  dayAddBtn:             { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  dayAddText:            { fontSize: 12, color: colors.primary600, fontWeight: '600' },
-  aiSuggestBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
-  aiSuggestText:         { color: colors.primary600, fontWeight: '700', fontSize: 14 },
+  dayAddBtn:             { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
+  dayAddText:            { fontSize: 12, color: colors.nomad.primary, fontWeight: '600' },
+  aiSuggestBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
+  aiSuggestText:         { color: colors.nomad.primary, fontWeight: '700', fontSize: 14 },
   // Timeline item — new layout: [time | dot+line | card]
   timelineRow:           { flexDirection: 'row', alignItems: 'stretch', marginBottom: 0 },
   timelineTimeCol:       { width: 50, alignItems: 'flex-end', paddingRight: 8, paddingTop: 13 },
   timelineTime:          { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   timelineDotCol:        { width: 20, alignItems: 'center', paddingTop: 11 },
-  timelineDot:           { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border, borderWidth: 2, borderColor: colors.primary600 },
-  timelineDotFirst:      { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary600, borderWidth: 0 },
-  timelineLine:          { width: 2, flex: 1, backgroundColor: colors.primary600 + '25', marginTop: 4, marginBottom: 0 },
+  timelineDot:           { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border, borderWidth: 2, borderColor: colors.nomad.primary },
+  timelineDotFirst:      { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.nomad.primary, borderWidth: 0 },
+  timelineLine:          { width: 2, flex: 1, backgroundColor: colors.nomad.primary + '25', marginTop: 4, marginBottom: 0 },
   timelineCard:          { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginLeft: 8, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3 },
   cardTitleRow:          { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   timelineTitle:         { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
@@ -1028,9 +1020,9 @@ const styles = StyleSheet.create({
   journalContent:     { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
   journalForm:        { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginTop: spacing.md },
   formLabel:          { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
-  dayBtn:             { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  dayBtnActive:       { backgroundColor: colors.primary600 },
-  dayBtnText:         { fontSize: 13, fontWeight: '500', color: colors.primary600 },
+  dayBtn:             { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e8f0d8', alignItems: 'center', justifyContent: 'center' },
+  dayBtnActive:       { backgroundColor: colors.nomad.primary },
+  dayBtnText:         { fontSize: 13, fontWeight: '500', color: colors.nomad.primary },
   dayBtnTextActive:   { color: colors.textOnDark },
   journalInput:       { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 100, marginBottom: spacing.md },
   // Info
@@ -1051,41 +1043,38 @@ const styles = StyleSheet.create({
   expOptionImg:       { width: 56, height: 56, borderRadius: radius.md, resizeMode: 'cover' },
   expOptionTitle:     { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   expOptionSub:       { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  expOptionCat:       { fontSize: 11, color: colors.primary600, marginTop: 2 },
+  expOptionCat:       { fontSize: 11, color: colors.nomad.primary, marginTop: 2 },
   pickedExpCard:      { flexDirection: 'row', gap: 10, backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
   pickedExpImg:       { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
   pickedExpTitle:     { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   pickedExpLoc:       { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   stepLabel:          { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   dayChip:            { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  dayChipActive:      { backgroundColor: colors.primary600, borderColor: colors.primary600 },
+  dayChipActive:      { backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
   dayChipText:        { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
   dayChipTextActive:  { color: colors.textOnDark },
   slotRow:            { flexDirection: 'row', gap: 8 },
   slotBtn:            { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  slotBtnActive:      { borderColor: colors.primary600, backgroundColor: colors.primary100 },
+  slotBtnActive:      { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
   slotIcon:           { fontSize: 18, marginBottom: 4 },
   slotLabel:          { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  slotLabelActive:    { color: colors.primary600 },
+  slotLabelActive:    { color: colors.nomad.primary },
   timeChip:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  timeChipActive:     { backgroundColor: colors.primary600, borderColor: colors.primary600 },
+  timeChipActive:     { backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
   timeChipText:       { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
   timeChipTextActive: { color: colors.textOnDark },
   noteInput:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 60, backgroundColor: colors.bgScreen },
   // Day tabs bar
   dayTabsBar:         { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bgCard, paddingVertical: 10 },
   dayTab:             { paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  dayTabActive:       { borderColor: colors.primary600, backgroundColor: colors.primary600 },
+  dayTabActive:       { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.primary },
   dayTabText:         { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   dayTabTextActive:   { color: '#fff' },
   // Day empty
   dayEmptyWrap:       { alignItems: 'center', paddingVertical: 40 },
   dayEmptyText:       { fontSize: 14, color: colors.textMuted, marginTop: 10, marginBottom: 20 },
-  // Freemium banner
-  freemiumBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary100, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, marginBottom: spacing.md },
-  freemiumBannerText: { flex: 1, fontSize: 12, color: colors.primary600, fontWeight: '500' },
   // AI item
-  aiItemBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.primary100 },
-  aiItemBadgeText:    { fontSize: 10, color: colors.primary600, fontWeight: '700' },
+  aiItemBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, backgroundColor: '#e8f0d8' },
+  aiItemBadgeText:    { fontSize: 10, color: colors.nomad.primary, fontWeight: '700' },
   timelineExpHint:    { fontStyle: 'italic', color: colors.textMuted },
 });
