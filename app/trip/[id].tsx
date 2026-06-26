@@ -203,7 +203,6 @@ export default function TripDetailScreen() {
         day_number:  d.day,
         time_slot:   slotMap[s.time_slot] ?? 'morning',
         note:        s.hint ?? null,
-        ai_reason:   s.reason ?? null,
         sort_order:  i,
       })));
 
