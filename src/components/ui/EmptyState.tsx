@@ -15,7 +15,7 @@ interface Props {
 export function EmptyState({ icon, title, body, ctaLabel, onCta }: Props) {
   return (
     <View style={styles.container}>
-      <Ionicons name={icon} size={64} color={colors.border} />
+      <Ionicons name={icon} size={64} color={colors.nomad.outlineVariant} />
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>
       {ctaLabel && onCta && (
@@ -27,7 +27,7 @@ export function EmptyState({ icon, title, body, ctaLabel, onCta }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  title:     { fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' },
-  body:      { fontSize: 14, color: colors.textMuted, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
+  title:     { fontSize: 18, fontWeight: '600', color: colors.nomad.onSurface, marginTop: spacing.lg, textAlign: 'center' },
+  body:      { fontSize: 14, color: colors.nomad.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
   cta:       { marginTop: spacing.xl },
 });

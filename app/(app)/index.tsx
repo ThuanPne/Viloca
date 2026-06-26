@@ -1,374 +1,515 @@
+import { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList,
-  Image, TouchableOpacity, StatusBar, TextInput,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, Image, ImageBackground, Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
-import { useUpcomingTrip } from '@/src/hooks/useUpcomingTrip';
-import { useTodaySchedule } from '@/src/hooks/useTodaySchedule';
-import { useLocations } from '@/src/hooks/useLocations';
 import { colors } from '@/src/theme/colors';
-import { spacing, radius } from '@/src/theme/spacing';
+import { useFestivals } from '@/src/hooks/useFestivals';
+import { useLocations } from '@/src/hooks/useLocations';
+import { FilterSheet, FilterTab } from '@/src/components/home/FilterSheet';
+import type { FestivalWithStatus } from '@/src/hooks/useFestivals';
 import type { Location } from '@/src/types';
 
-const SLOT_ICON: Record<string, string> = {
-  morning: '🌅', afternoon: '☀️', evening: '🌙',
-};
+const { width: SCREEN_W } = Dimensions.get('window');
+const CAROUSEL_W = SCREEN_W - 56;
 
-const QUICK_ACTIONS = [
-  { icon: 'add-circle', label: 'Tạo trip',  color: '#fff', bg: 'rgba(255,255,255,0.2)', action: '/(app)/workspace' },
-  { icon: 'compass',    label: 'Khám phá',  color: '#fff', bg: 'rgba(255,255,255,0.2)', action: '/(app)/explore'   },
-  { icon: 'book',       label: 'Nhật ký',   color: '#fff', bg: 'rgba(255,255,255,0.2)', action: null               },
-  { icon: 'bag-handle', label: 'Hành lý',   color: '#fff', bg: 'rgba(255,255,255,0.2)', action: null               },
+const CATEGORY_CHIPS = [
+  { label: 'Di tích',     value: 'Di tích' },
+  { label: 'Ẩm thực',    value: 'Ẩm thực' },
+  { label: 'Nghệ thuật',  value: 'Nghệ thuật' },
+  { label: 'Thiên nhiên', value: 'Thiên nhiên' },
+  { label: 'Kiến trúc',  value: 'Kiến trúc' },
 ];
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Chào buổi sáng ☀️';
-  if (h < 18) return 'Chào buổi chiều 🌤';
-  return 'Chào buổi tối 🌙';
+function festivalBadge(f: FestivalWithStatus) {
+  if (f.displayStatus === 'coming_soon') return 'Sắp diễn ra';
+  if (f.displayStatus === 'days_away')   return `${f.daysAway} ngày nữa`;
+  return `${f.monthsAway} tháng nữa`;
 }
 
-function formatPrice(p: number) {
-  if (p >= 1_000_000) return (p / 1_000_000).toFixed(1) + 'M';
-  if (p >= 1_000)     return (p / 1_000).toFixed(0) + 'K';
-  return p.toString();
+function cityLabel(code: string | null) {
+  if (code === 'SG') return 'TP. HCM';
+  if (code === 'HN') return 'Hà Nội';
+  if (code === 'DN') return 'Đà Nẵng';
+  return code ?? '';
 }
 
+// ─── Festival carousel card ──────────────────────────────────────────────────
+function FestivalCarouselCard({ festival }: { festival: FestivalWithStatus }) {
+  return (
+    <TouchableOpacity activeOpacity={0.9}>
+      <ImageBackground
+        source={festival.cover_image ? { uri: festival.cover_image } : undefined}
+        style={[styles.festivalCard, { width: CAROUSEL_W }]}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: 24 }}
+      >
+        {!festival.cover_image && (
+          <LinearGradient
+            colors={[colors.nomad.primaryContainer, colors.nomad.primary]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.78)']}
+          locations={[0.35, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={styles.festivalBadge}>
+          <Text style={styles.festivalBadgeText}>{festivalBadge(festival)}</Text>
+        </View>
+        <View style={styles.festivalInfo}>
+          <Text style={styles.festivalTitle} numberOfLines={2}>{festival.name}</Text>
+          <Text style={styles.festivalSub}>📍 {festival.location}</Text>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Hero card (full-width, tall) ────────────────────────────────────────────
+function HeroCard({ location }: { location: Location }) {
+  const firstPhoto = location.photos?.split(',')[0]?.trim();
+  const subtitle   = [location.district, cityLabel(location.city)].filter(Boolean).join(', ');
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={() => router.push(`/location/${location.id}`)}>
+      <ImageBackground
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={styles.heroCard}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: 20 }}
+      >
+        {!firstPhoto && (
+          <LinearGradient
+            colors={[colors.nomad.inverseSurface, colors.nomad.primary]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.82)']}
+          locations={[0.2, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={styles.heroInfo}>
+          <Text style={styles.heroName} numberOfLines={2}>{location.name}</Text>
+          <View style={styles.heroSubRow}>
+            <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.heroSub}>{subtitle}</Text>
+          </View>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Small card (2 side-by-side) ─────────────────────────────────────────────
+function SmallCard({ location }: { location: Location }) {
+  const firstPhoto = location.photos?.split(',')[0]?.trim();
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={() => router.push(`/location/${location.id}`)} style={{ flex: 1 }}>
+      <ImageBackground
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={styles.smallCard}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: 16 }}
+      >
+        {!firstPhoto && (
+          <LinearGradient
+            colors={[colors.nomad.primary, colors.nomad.primaryContainer]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.78)']}
+          locations={[0.15, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={styles.smallInfo}>
+          <Text style={styles.smallName} numberOfLines={2}>{location.name}</Text>
+          {location.district ? (
+            <Text style={styles.smallSub} numberOfLines={1}>{location.district}</Text>
+          ) : null}
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Carousel card (auto-scroll) ─────────────────────────────────────────────
+function CarouselCard({ location }: { location: Location }) {
+  const firstPhoto    = location.photos?.split(',')[0]?.trim();
+  const subtitle      = [location.district, cityLabel(location.city)].filter(Boolean).join(', ');
+  const firstCategory = location.category?.split(',')[0]?.trim();
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={() => router.push(`/location/${location.id}`)}>
+      <ImageBackground
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={[styles.carouselCard, { width: CAROUSEL_W }]}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: 20 }}
+      >
+        {!firstPhoto && (
+          <LinearGradient
+            colors={[colors.nomad.surfaceDim, colors.nomad.inverseSurface]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.82)']}
+          locations={[0.25, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {firstCategory && (
+          <View style={styles.carouselBadge}>
+            <Text style={styles.carouselBadgeText}>{firstCategory}</Text>
+          </View>
+        )}
+        <View style={styles.carouselInfo}>
+          <Text style={styles.carouselName} numberOfLines={1}>{location.name}</Text>
+          <View style={styles.carouselSubRow}>
+            <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.75)" />
+            <Text style={styles.carouselSub}>{subtitle}</Text>
+          </View>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
-  const user = useAuthStore((s) => s.user);
-  const { trip, daysUntil, loading: tripLoading } = useUpcomingTrip();
-  const { items: scheduleItems, dayNumber } = useTodaySchedule(trip);
-  const { locations } = useLocations(null);
-
+  const insets    = useSafeAreaInsets();
+  const user      = useAuthStore((s) => s.user);
   const firstName = user?.user_metadata?.full_name?.split(' ').pop() ?? 'bạn';
-  const recommendations = locations.slice(0, 8);
 
-  const tripAction = trip ? `/trip/${trip.id}` : '/(app)/workspace';
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [sheetVisible, setSheetVisible]     = useState(false);
+  const [sheetTab, setSheetTab]             = useState<FilterTab>('category');
+  const [carouselIndex, setCarouselIndex]   = useState(0);
+  const [festivalIndex, setFestivalIndex]   = useState(0);
+  const carouselRef  = useRef<ScrollView>(null);
+  const festivalRef  = useRef<ScrollView>(null);
+
+  const { festivals, loading: festivalsLoading }    = useFestivals();
+  const { locations: featured }                      = useLocations(3);
+  const { locations, loading: locationsLoading }     = useLocations(5, activeCategory);
+
+  // Chỉ show festivals trong vòng 1 tháng tới
+  const nearFestivals = festivals.filter(
+    (f) => f.displayStatus !== 'months_away' || (f.monthsAway ?? 99) <= 1
+  );
+
+  // Auto-scroll location carousel every 3s
+  useEffect(() => {
+    if (locations.length === 0) return;
+    const interval = setInterval(() => {
+      const next = (carouselIndex + 1) % locations.length;
+      carouselRef.current?.scrollTo({ x: next * (CAROUSEL_W + 14), animated: true });
+      setCarouselIndex(next);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [carouselIndex, locations.length]);
+
+  // Auto-scroll festival carousel every 3.5s
+  useEffect(() => {
+    if (nearFestivals.length <= 1) return;
+    const interval = setInterval(() => {
+      const next = (festivalIndex + 1) % nearFestivals.length;
+      festivalRef.current?.scrollTo({ x: next * (CAROUSEL_W + 14), animated: true });
+      setFestivalIndex(next);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [festivalIndex, nearFestivals.length]);
+
+  const [hero, ...rest] = featured;
+  const smallCards = rest.slice(0, 2);
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary600} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
 
-      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      {/* ── Background decoration ── */}
+      <LinearGradient
+        colors={['rgba(232,255,194,0.5)', 'rgba(250,250,240,0)']}
+        locations={[0, 1]}
+        style={styles.bgGradient}
+        pointerEvents="none"
+      />
+      <View style={styles.bgBlobTopRight} pointerEvents="none" />
+      <View style={styles.bgBlobMidLeft} pointerEvents="none" />
 
-        {/* ── HERO HEADER (sticky) ── */}
-        <View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-          {/* Top bar */}
-          <View style={styles.heroTop}>
-            <View>
-              <Text style={styles.heroGreeting}>{getGreeting()},</Text>
-              <Text style={styles.heroName}>{firstName}!</Text>
-            </View>
-            <TouchableOpacity style={styles.avatarBtn}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>
-                  {firstName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      >
+        {/* ── Header (scrolls with page) ── */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Image source={require('@/assets/viloca-logo.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
-
-          {/* Hero tagline */}
-          <Text style={styles.heroTagline}>Khám phá thế giới đẹp!</Text>
-
-          {/* Search bar */}
-          <TouchableOpacity
-            style={styles.searchBar}
-            activeOpacity={0.85}
-            onPress={() => router.push('/(app)/explore' as any)}
-          >
-            <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-            <Text style={styles.searchPlaceholder}>Bạn muốn đi đâu?</Text>
-            <View style={styles.searchFilter}>
-              <Ionicons name="options-outline" size={16} color={colors.primary600} />
-            </View>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Ionicons name="notifications-outline" size={24} color={colors.nomad.onSurface} />
           </TouchableOpacity>
-
-          {/* Quick Actions — horizontal chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
-            {QUICK_ACTIONS.map(({ icon, label, bg, action }) => (
-              <TouchableOpacity
-                key={label}
-                style={[styles.quickChip, { backgroundColor: bg }]}
-                activeOpacity={0.75}
-                onPress={() => router.push((action ?? tripAction) as any)}
-              >
-                <Ionicons name={icon as any} size={16} color="#fff" />
-                <Text style={styles.quickChipLabel}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
-        {/* ── BODY ── */}
-        <View style={styles.body}>
+        {/* Greeting */}
+        <View style={styles.heroSection}>
+          <Text style={styles.greeting}>{firstName} ơi!</Text>
+          <Text style={styles.tagline}>Hôm nay đi đâu?</Text>
+        </View>
 
-          {/* Upcoming Trip */}
-          {!tripLoading && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Chuyến đi sắp tới</Text>
-                <TouchableOpacity onPress={() => router.push('/(app)/workspace' as any)}>
-                  <Text style={styles.sectionLink}>Tất cả →</Text>
-                </TouchableOpacity>
-              </View>
+        {/* Search bar */}
+        <TouchableOpacity style={styles.searchBar} activeOpacity={0.85} onPress={() => router.push('/search')}>
+          <Ionicons name="search-outline" size={18} color={colors.nomad.primary} />
+          <Text style={styles.searchPlaceholder}>Quán cà phê, bảo tàng, phố cổ...</Text>
+        </TouchableOpacity>
 
-              {trip ? (
-                <TouchableOpacity
-                  style={styles.tripCard}
-                  activeOpacity={0.9}
-                  onPress={() => router.push(`/trip/${trip.id}` as any)}
-                >
-                  <Image
-                    source={{ uri: trip.cover_image ?? `https://picsum.photos/seed/${trip.id}/800/400` }}
-                    style={styles.tripCardBg}
-                  />
-                  {/* Gradient-like overlay using two Views */}
-                  <View style={styles.tripCardOverlayTop} />
-                  <View style={styles.tripCardOverlayBottom} />
+        {/* Category chips */}
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          style={styles.chipsScroll}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+        >
+          {CATEGORY_CHIPS.map((chip) => {
+            const active = activeCategory === chip.value;
+            return (
+              <TouchableOpacity
+                key={chip.value}
+                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                onPress={() => setActiveCategory(active ? null : chip.value)}
+              >
+                <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-                  {/* Countdown badge */}
-                  <View style={styles.tripCountdownBadge}>
-                    <Text style={styles.tripCountdownNum}>{daysUntil}</Text>
-                    <Text style={styles.tripCountdownUnit}>ngày</Text>
-                  </View>
+        {/* ── Dành cho bạn ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Dành cho bạn</Text>
+          <Text style={styles.seeAll}>Xem tất cả</Text>
+        </View>
 
-                  {/* Bottom info */}
-                  <View style={styles.tripCardContent}>
-                    <Text style={styles.tripCardTitle} numberOfLines={1}>{trip.title}</Text>
-                    <View style={styles.tripCardRow}>
-                      <View style={styles.tripCardLocation}>
-                        <Ionicons name="location" size={12} color="rgba(255,255,255,0.85)" />
-                        <Text style={styles.tripCardDest} numberOfLines={1}>{trip.destination}</Text>
-                      </View>
-                      {trip.start_date && (
-                        <Text style={styles.tripCardDate}>{trip.start_date}</Text>
-                      )}
-                    </View>
-                    <View style={styles.tripCardCta}>
-                      <Text style={styles.tripCardCtaText}>Xem lịch trình</Text>
-                      <Ionicons name="arrow-forward" size={12} color={colors.primary600} />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.noTripCard}
-                  onPress={() => router.push('/(app)/workspace' as any)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.noTripIcon}>
-                    <Text style={{ fontSize: 32 }}>🗺️</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.noTripTitle}>Lên kế hoạch ngay!</Text>
-                    <Text style={styles.noTripSub}>Chưa có chuyến đi nào sắp tới</Text>
-                  </View>
-                  <View style={styles.noTripArrow}>
-                    <Ionicons name="add" size={20} color="#fff" />
-                  </View>
-                </TouchableOpacity>
-              )}
+        <View style={styles.featuredWrap}>
+          {hero && <HeroCard location={hero} />}
+          {smallCards.length > 0 && (
+            <View style={styles.smallRow}>
+              {smallCards.map((loc) => <SmallCard key={loc.id} location={loc} />)}
             </View>
           )}
+        </View>
 
-          {/* Today's Schedule */}
-          {trip?.status === 'active' && scheduleItems.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Hôm nay · Ngày {dayNumber}</Text>
+        {/* ── Đừng bỏ lỡ ── */}
+        <View style={[styles.sectionHeader, { marginTop: 32 }]}>
+          <Text style={styles.sectionTitle}>Đừng bỏ lỡ</Text>
+          <Text style={styles.seeAll}>Xem tất cả</Text>
+        </View>
+
+        {festivalsLoading ? (
+          <ActivityIndicator color={colors.nomad.primary} style={{ marginVertical: 32 }} />
+        ) : nearFestivals.length === 0 ? (
+          <Text style={styles.emptyText}>Không có sự kiện nào trong thời gian tới</Text>
+        ) : (
+          <View>
+            <ScrollView
+              ref={festivalRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CAROUSEL_W + 14}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+              scrollEventThrottle={16}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (CAROUSEL_W + 14));
+                setFestivalIndex(Math.max(0, Math.min(idx, nearFestivals.length - 1)));
+              }}
+            >
+              {nearFestivals.map((f) => <FestivalCarouselCard key={f.id} festival={f} />)}
+            </ScrollView>
+            {nearFestivals.length > 1 && (
+              <View style={styles.dotsWrap}>
+                <View style={styles.dotsPill}>
+                  {nearFestivals.map((_, i) => (
+                    <View key={i} style={[styles.dot, i === festivalIndex && styles.dotActive]} />
+                  ))}
+                </View>
               </View>
-              <View style={styles.timelineCard}>
-                {scheduleItems.map((item, idx) => (
-                  <View key={item.id} style={styles.timelineRow}>
-                    <View style={styles.timelineLine}>
-                      <View style={styles.timelineDot} />
-                      {idx < scheduleItems.length - 1 && <View style={styles.timelineConnector} />}
-                    </View>
-                    <View style={styles.timelineContent}>
-                      <Text style={styles.timelineSlot}>{SLOT_ICON[item.time_slot]}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.timelineTitle} numberOfLines={1}>{item.experience_title}</Text>
-                        {item.experience_location && (
-                          <Text style={styles.timelineLoc}>📍 {item.experience_location}</Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Dân local hay ghé (auto-scroll carousel) ── */}
+        <View style={[styles.sectionHeader, { marginTop: 32 }]}>
+          <Text style={styles.sectionTitle}>Phải ghé một lần</Text>
+        </View>
+
+        {locationsLoading ? (
+          <ActivityIndicator color={colors.nomad.primary} style={{ marginVertical: 24 }} />
+        ) : locations.length === 0 ? (
+          <Text style={styles.emptyText}>Không có địa điểm nào</Text>
+        ) : (
+          <View>
+            <ScrollView
+              ref={carouselRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CAROUSEL_W + 14}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+              scrollEventThrottle={16}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (CAROUSEL_W + 14));
+                setCarouselIndex(Math.max(0, Math.min(idx, locations.length - 1)));
+              }}
+            >
+              {locations.map((loc) => <CarouselCard key={loc.id} location={loc} />)}
+            </ScrollView>
+
+            {/* Dot indicators */}
+            <View style={styles.dotsWrap}>
+              <View style={styles.dotsPill}>
+                {locations.map((_, i) => (
+                  <View key={i} style={[styles.dot, i === carouselIndex && styles.dotActive]} />
                 ))}
               </View>
             </View>
-          )}
-
-          {/* Recommended */}
-          <View style={[styles.section, { paddingHorizontal: 0 }]}>
-            <View style={[styles.sectionHeader, { paddingHorizontal: spacing.lg }]}>
-              <Text style={styles.sectionTitle}>Gợi ý cho bạn</Text>
-              <TouchableOpacity onPress={() => router.push('/(app)/explore' as any)}>
-                <Text style={styles.sectionLink}>Xem thêm →</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 2-column grid for first 4 */}
-            <View style={styles.recGrid}>
-              {recommendations.slice(0, 4).map((item) => (
-                <RecCard key={item.id} item={item} />
-              ))}
-            </View>
-
-            {/* Horizontal scroll for rest */}
-            {recommendations.length > 4 && (
-              <FlatList
-                horizontal
-                data={recommendations.slice(4)}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 12, marginTop: 12 }}
-                renderItem={({ item }) => <RecCardSmall item={item} />}
-              />
-            )}
           </View>
-
-          <View style={{ height: 20 }} />
-        </View>
+        )}
       </ScrollView>
+
+      <FilterSheet
+        visible={sheetVisible}
+        initialTab={sheetTab}
+        onClose={() => setSheetVisible(false)}
+      />
     </View>
   );
 }
 
-function RecCard({ item }: { item: Location }) {
-  const coverUri = item.cover_image ?? `https://picsum.photos/seed/${item.id}/800/600`;
-  const locLabel = item.district ?? item.city ?? '';
-  return (
-    <TouchableOpacity
-      style={styles.recCard}
-      activeOpacity={0.88}
-      onPress={() => router.push(`/experience/${item.id}` as any)}
-    >
-      <Image source={{ uri: coverUri }} style={styles.recCardImg} />
-      <View style={styles.recCardOverlay} />
-      <View style={styles.recCardContent}>
-        <Text style={styles.recCardTitle} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.recCardMeta}>
-          <Text style={styles.recCardLoc} numberOfLines={1}>📍 {locLabel}</Text>
-          <Text style={styles.recCardPrice}>{formatPrice(item.price_per_person)}đ</Text>
-        </View>
-      </View>
-      {item.rating != null && (
-        <View style={styles.recCardRating}>
-          <Ionicons name="star" size={10} color="#FBBF24" />
-          <Text style={styles.recCardRatingText}>{item.rating.toFixed(1)}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-function RecCardSmall({ item }: { item: Location }) {
-  const coverUri = item.cover_image ?? `https://picsum.photos/seed/${item.id}/800/600`;
-  return (
-    <TouchableOpacity
-      style={styles.recCardSmall}
-      activeOpacity={0.88}
-      onPress={() => router.push(`/experience/${item.id}` as any)}
-    >
-      <Image source={{ uri: coverUri }} style={styles.recCardSmallImg} />
-      <View style={styles.recCardSmallOverlay} />
-      <View style={styles.recCardSmallContent}>
-        <Text style={styles.recCardSmallTitle} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.recCardSmallPrice}>{formatPrice(item.price_per_person)}đ</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7F8FA' },
+  screen: { flex: 1, backgroundColor: colors.nomad.background },
 
-  // Hero
-  hero:             { backgroundColor: colors.primary600, paddingHorizontal: spacing.lg, paddingBottom: 24 },
-  heroTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  heroGreeting:     { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '400' },
-  heroName:         { fontSize: 22, color: '#fff', fontWeight: '800', marginTop: 2 },
-  heroTagline:      { fontSize: 28, color: '#fff', fontWeight: '800', lineHeight: 34, marginBottom: 18 },
-  avatarBtn:        { marginTop: 4 },
-  avatarCircle:     { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
-  avatarText:       { color: '#fff', fontSize: 18, fontWeight: '700' },
+  // Background decoration
+  bgGradient: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 280,
+  },
+  bgBlobTopRight: {
+    position: 'absolute', top: -40, right: -60,
+    width: 220, height: 220, borderRadius: 110,
+    backgroundColor: colors.nomad.secondaryContainer, opacity: 0.35,
+  },
+  bgBlobMidLeft: {
+    position: 'absolute', top: 160, left: -50,
+    width: 150, height: 150, borderRadius: 75,
+    backgroundColor: colors.nomad.onPrimaryContainer, opacity: 0.5,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10,
+    backgroundColor: colors.nomad.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.nomad.outlineVariant,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoImg:    { width: 44, height: 44 },
+  headerIcon: { padding: 4 },
+
+  // Greeting
+  heroSection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  greeting:    { fontSize: 28, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 36 },
+  tagline:     { fontSize: 28, fontWeight: '700', color: colors.nomad.primaryContainer, lineHeight: 36 },
 
   // Search
-  searchBar:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  searchPlaceholder:{ flex: 1, fontSize: 14, color: colors.textMuted },
-  searchFilter:     { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 20, marginBottom: 16,
+    backgroundColor: colors.nomad.surfaceContainerLow,
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,
+    shadowColor: colors.nomad.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 2,
+  },
+  searchPlaceholder: { flex: 1, fontSize: 15, color: colors.nomad.outline },
 
-  // Quick chips
-  quickRow:         { gap: 10, paddingRight: 4 },
-  quickChip:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  quickChipLabel:   { color: '#fff', fontSize: 13, fontWeight: '600' },
+  // Category chips
+  chipsScroll:            { marginBottom: 24 },
+  categoryChip:           { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 99, backgroundColor: colors.nomad.surfaceContainer },
+  categoryChipActive:     { backgroundColor: colors.nomad.secondaryContainer },
+  categoryChipText:       { fontSize: 12, fontWeight: '600', color: colors.nomad.onSurfaceVariant, letterSpacing: 0.3 },
+  categoryChipTextActive: { color: colors.nomad.onSurface },
 
-  // Body
-  body:             { paddingTop: 20 },
-  section:          { paddingHorizontal: spacing.lg, marginBottom: 24 },
-  sectionHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle:     { fontSize: 18, fontWeight: '800', color: '#1A1A2E' },
-  sectionLink:      { fontSize: 13, color: colors.primary600, fontWeight: '600' },
+  // Section headers
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, marginBottom: 16,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.nomad.onSurface },
+  seeAll:       { fontSize: 12, fontWeight: '600', color: colors.nomad.primary },
 
-  // Trip card
-  tripCard:         { height: 220, borderRadius: 20, overflow: 'hidden', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
-  tripCardBg:       { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  tripCardOverlayTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 80, backgroundColor: 'rgba(0,0,0,0.15)' },
-  tripCardOverlayBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 130, backgroundColor: 'rgba(0,0,0,0.55)' },
-  tripCountdownBadge:    { position: 'absolute', top: 14, right: 14, backgroundColor: colors.primary600, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center' },
-  tripCountdownNum:      { color: '#fff', fontSize: 20, fontWeight: '800', lineHeight: 24 },
-  tripCountdownUnit:     { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '500' },
-  tripCardContent:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16 },
-  tripCardTitle:         { color: '#fff', fontSize: 19, fontWeight: '800', marginBottom: 6 },
-  tripCardRow:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  tripCardLocation:      { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  tripCardDest:          { color: 'rgba(255,255,255,0.85)', fontSize: 12, flex: 1 },
-  tripCardDate:          { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
-  tripCardCta:           { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  tripCardCtaText:       { fontSize: 12, fontWeight: '700', color: colors.primary600 },
+  // Featured section
+  featuredWrap: { paddingHorizontal: 20, gap: 12 },
 
-  // No trip
-  noTripCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 14, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, borderWidth: 1, borderColor: '#F0F0F0' },
-  noTripIcon:       { width: 56, height: 56, borderRadius: 16, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  noTripTitle:      { fontSize: 15, fontWeight: '700', color: '#1A1A2E', marginBottom: 3 },
-  noTripSub:        { fontSize: 12, color: colors.textMuted },
-  noTripArrow:      { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center' },
+  // Hero card
+  heroCard: {
+    width: '100%', height: 200, borderRadius: 20,
+    overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainer,
+  },
+  heroInfo:   { position: 'absolute', bottom: 20, left: 20, right: 20 },
+  heroName:   { fontSize: 22, fontWeight: '700', color: '#fff', lineHeight: 28, marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  heroSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heroSub:    { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
 
-  // Timeline
-  timelineCard:     { backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
-  timelineRow:      { flexDirection: 'row', gap: 12 },
-  timelineLine:     { width: 20, alignItems: 'center' },
-  timelineDot:      { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary600, marginTop: 4 },
-  timelineConnector:{ width: 2, flex: 1, backgroundColor: colors.primary100, marginVertical: 4 },
-  timelineContent:  { flex: 1, flexDirection: 'row', gap: 10, paddingBottom: 14 },
-  timelineSlot:     { fontSize: 18, width: 26 },
-  timelineTitle:    { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
-  timelineLoc:      { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  // Small cards
+  smallRow:  { flexDirection: 'row', gap: 12 },
+  smallCard: {
+    flex: 1, height: 130, borderRadius: 16,
+    overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainer,
+  },
+  smallInfo: { position: 'absolute', bottom: 12, left: 12, right: 12 },
+  smallName: { fontSize: 13, fontWeight: '700', color: '#fff', lineHeight: 18, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  smallSub:  { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
 
-  // Rec grid (2 columns)
-  recGrid:          { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, gap: 12 },
-  recCard:          { width: '47.5%', height: 180, borderRadius: 16, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  recCardImg:       { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  recCardOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.32)' },
-  recCardContent:   { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
-  recCardTitle:     { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 17, marginBottom: 4 },
-  recCardMeta:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  recCardLoc:       { color: 'rgba(255,255,255,0.8)', fontSize: 10, flex: 1 },
-  recCardPrice:     { color: '#FCD34D', fontSize: 11, fontWeight: '700' },
-  recCardRating:    { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
-  recCardRatingText:{ color: '#fff', fontSize: 10, fontWeight: '600' },
+  // Festival carousel
+  festivalCard: {
+    height: 220, borderRadius: 24,
+    overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainer,
+  },
+  festivalBadge:     { position: 'absolute', top: 16, left: 16, backgroundColor: colors.nomad.primary, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5 },
+  festivalBadgeText: { fontSize: 12, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  festivalInfo:      { position: 'absolute', bottom: 20, left: 20, right: 20 },
+  festivalTitle:     { fontSize: 20, fontWeight: '700', color: '#fff', lineHeight: 26, marginBottom: 4 },
+  festivalSub:       { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
 
-  // Rec card small (horizontal)
-  recCardSmall:        { width: 140, height: 130, borderRadius: 14, overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 },
-  recCardSmallImg:     { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  recCardSmallOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
-  recCardSmallContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8 },
-  recCardSmallTitle:   { color: '#fff', fontSize: 11, fontWeight: '700', lineHeight: 15, marginBottom: 2 },
-  recCardSmallPrice:   { color: '#FCD34D', fontSize: 10, fontWeight: '700' },
+  // Carousel
+  carouselCard: {
+    height: 200, borderRadius: 20,
+    overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainer,
+  },
+  carouselBadge:     { position: 'absolute', top: 16, left: 16, backgroundColor: colors.nomad.primary, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
+  carouselBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  carouselInfo:      { position: 'absolute', bottom: 20, left: 20, right: 20 },
+  carouselName:      { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  carouselSubRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  carouselSub:       { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
+
+  // Dots
+  dotsWrap: { alignItems: 'center', marginTop: 14 },
+  dotsPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  dot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.nomad.outlineVariant },
+  dotActive: { width: 22, height: 7, borderRadius: 4, backgroundColor: colors.nomad.primary },
+
+  emptyText: { paddingHorizontal: 20, fontSize: 13, color: colors.nomad.onSurfaceVariant },
 });
