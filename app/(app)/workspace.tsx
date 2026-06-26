@@ -75,7 +75,7 @@ export default function WorkspaceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary600} />
+        <ActivityIndicator size="large" color={colors.nomad.primary} />
       </View>
     );
   }
@@ -89,11 +89,11 @@ export default function WorkspaceScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.aiBtn} onPress={openCreate}>
-            <Ionicons name="sparkles-outline" size={16} color={colors.primary600} />
+            <Ionicons name="sparkles-outline" size={16} color={colors.nomad.primary} />
             <Text style={styles.aiText}>AI Plan</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-            <Ionicons name="add" size={20} color={colors.textOnDark} />
+            <Ionicons name="add" size={20} color={colors.nomad.onPrimary} />
             <Text style={styles.addText}>Trip mới</Text>
           </TouchableOpacity>
         </View>
@@ -161,24 +161,24 @@ function formatDate(iso: string) {
 const styles = StyleSheet.create({
   center:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
-  heading:        { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  subheading:     { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  heading:        { fontSize: 22, fontWeight: '800', color: colors.nomad.onSurface },
+  subheading:     { fontSize: 13, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
   headerActions:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aiBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  aiText:         { color: colors.primary600, fontWeight: '600', fontSize: 14 },
-  addBtn:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary600, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  addText:        { color: colors.textOnDark, fontWeight: '600', fontSize: 14 },
+  aiBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  aiText:         { color: colors.nomad.primary, fontWeight: '600', fontSize: 14 },
+  addBtn:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.nomad.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  addText:        { color: colors.nomad.onPrimary, fontWeight: '600', fontSize: 14 },
 
-  tripCard:       { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.bgCard, elevation: 2 },
+  tripCard:       { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainerLow, elevation: 2 },
   tripImageWrap:  { height: 100, overflow: 'hidden' },
   tripImage:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: 100, resizeMode: 'cover' },
   tripOverlay:    { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.2)' },
   tripBadge:      { position: 'absolute', top: 12, right: 12 },
-  aiBadge:        { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(200,96,46,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  aiBadge:        { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
   aiBadgeText:    { fontSize: 10, color: '#fff', fontWeight: '700' },
   tripInfo:       { paddingHorizontal: spacing.md, paddingVertical: 6 },
-  tripTitle:      { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 1 },
-  tripDest:       { fontSize: 11, color: colors.textMuted },
-  tripDate:       { fontSize: 11, color: colors.primary600, marginTop: 1, fontWeight: '500' },
+  tripTitle:      { fontSize: 14, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: 1 },
+  tripDest:       { fontSize: 11, color: colors.nomad.onSurfaceVariant },
+  tripDate:       { fontSize: 11, color: colors.nomad.primary, marginTop: 1, fontWeight: '500' },
 
 });

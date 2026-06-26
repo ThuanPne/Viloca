@@ -29,6 +29,6 @@ export function ScreenWrapper({ children, scrollable = false, style }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bgScreen },
+  container: { flex: 1, backgroundColor: colors.nomad.background },
   content:   { paddingBottom: 32 },
 });

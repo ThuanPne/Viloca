@@ -190,11 +190,11 @@ export default function CreateTripScreen() {
       <SafeAreaView style={styles.loadingScreen}>
         <View style={styles.loadingContent}>
           <View style={styles.loadingIconWrap}>
-            <Ionicons name="sparkles" size={52} color={colors.primary600} />
+            <Ionicons name="sparkles" size={52} color={colors.nomad.primary} />
           </View>
           <Text style={styles.loadingTitle}>AI đang tạo lịch trình</Text>
           <Text style={styles.loadingSubtitle}>Đang phân tích địa điểm và tối ưu hành trình cho bạn...</Text>
-          <ActivityIndicator size="small" color={colors.primary600} style={{ marginTop: spacing.lg }} />
+          <ActivityIndicator size="small" color={colors.nomad.primary} style={{ marginTop: spacing.lg }} />
           {aiLogs.length > 0 && (
             <View style={styles.logBox}>
               {aiLogs.map((msg, i) => (
@@ -215,7 +215,7 @@ export default function CreateTripScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBack} onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.nomad.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{stepTitle}</Text>
         <View style={{ width: 40 }} />
@@ -259,7 +259,7 @@ export default function CreateTripScreen() {
             <TextInput
               style={styles.input}
               placeholder="VD: Hội An cuối tuần"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.nomad.onSurfaceVariant}
               value={title}
               onChangeText={setTitle}
             />
@@ -272,7 +272,7 @@ export default function CreateTripScreen() {
               <Text style={destination ? styles.destPickerText : styles.destPickerPlaceholder}>
                 {destination || 'Chọn tỉnh / thành phố...'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-down" size={16} color={colors.nomad.onSurfaceVariant} />
             </TouchableOpacity>
 
             <View style={{ marginTop: spacing.xl }}>
@@ -288,24 +288,24 @@ export default function CreateTripScreen() {
 
             <TouchableOpacity style={styles.methodCard} onPress={() => { setError(''); setStep('3a'); }} activeOpacity={0.85}>
               <View style={styles.methodIcon}>
-                <Ionicons name="sparkles" size={28} color={colors.primary600} />
+                <Ionicons name="sparkles" size={28} color={colors.nomad.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.methodTitle}>Tạo bằng AI</Text>
                 <Text style={styles.methodDesc}>AI gợi ý lịch trình theo phong cách và ngân sách của bạn</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={20} color={colors.nomad.onSurfaceVariant} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.methodCard} onPress={() => { setError(''); setStep('3b'); }} activeOpacity={0.85}>
-              <View style={[styles.methodIcon, { backgroundColor: colors.secondary100 }]}>
-                <Ionicons name="pencil-outline" size={28} color={colors.secondary600} />
+              <View style={[styles.methodIcon, { backgroundColor: colors.nomad.secondaryContainer }]}>
+                <Ionicons name="pencil-outline" size={28} color={colors.nomad.secondary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.methodTitle}>Tạo thủ công</Text>
                 <Text style={styles.methodDesc}>Tự thêm địa điểm và sắp xếp theo ý muốn</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={20} color={colors.nomad.onSurfaceVariant} />
             </TouchableOpacity>
           </View>
         )}
@@ -325,11 +325,11 @@ export default function CreateTripScreen() {
             <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số người</Text>
             <View style={styles.stepper}>
               <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.max(1, groupSize - 1))}>
-                <Ionicons name="remove" size={20} color={colors.textPrimary} />
+                <Ionicons name="remove" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
               <Text style={styles.stepperVal}>{groupSize}</Text>
               <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.min(20, groupSize + 1))}>
-                <Ionicons name="add" size={20} color={colors.textPrimary} />
+                <Ionicons name="add" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
             </View>
 
@@ -343,11 +343,11 @@ export default function CreateTripScreen() {
             <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số ngày</Text>
             <View style={styles.stepper}>
               <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.max(1, days - 1))}>
-                <Ionicons name="remove" size={20} color={colors.textPrimary} />
+                <Ionicons name="remove" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
               <Text style={styles.stepperVal}>{days} ngày</Text>
               <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.min(14, days + 1))}>
-                <Ionicons name="add" size={20} color={colors.textPrimary} />
+                <Ionicons name="add" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
             </View>
 
@@ -403,7 +403,7 @@ export default function CreateTripScreen() {
             <DatePicker value={endDate} onChange={setEndDate} placeholder="Chọn ngày về" minDate={startDate ? new Date(startDate) : undefined} />
 
             <View style={styles.dateHint}>
-              <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
+              <Ionicons name="information-circle-outline" size={13} color={colors.nomad.onSurfaceVariant} />
               <Text style={styles.dateHintText}>Ngày đi có thể thêm sau trong trip</Text>
             </View>
 
@@ -422,22 +422,22 @@ export default function CreateTripScreen() {
             <View style={styles.provinceHeader}>
               <Text style={styles.provinceTitle}>Chọn điểm đến</Text>
               <TouchableOpacity onPress={() => setShowProvincePicker(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
+                <Ionicons name="close" size={24} color={colors.nomad.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
             <View style={styles.provinceSearchWrap}>
-              <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+              <Ionicons name="search-outline" size={16} color={colors.nomad.onSurfaceVariant} />
               <TextInput
                 style={styles.provinceSearchInput}
                 placeholder="Tìm tỉnh / thành phố..."
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={colors.nomad.onSurfaceVariant}
                 value={provinceSearch}
                 onChangeText={setProvinceSearch}
                 autoFocus
               />
               {provinceSearch ? (
                 <TouchableOpacity onPress={() => setProvinceSearch('')}>
-                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                  <Ionicons name="close-circle" size={16} color={colors.nomad.onSurfaceVariant} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -453,10 +453,10 @@ export default function CreateTripScreen() {
                   onPress={() => { setDestination(item); setShowProvincePicker(false); }}
                 >
                   <Text style={[styles.provinceItemText, destination === item && styles.provinceItemTextActive]}>{item}</Text>
-                  {destination === item && <Ionicons name="checkmark" size={16} color={colors.primary600} />}
+                  {destination === item && <Ionicons name="checkmark" size={16} color={colors.nomad.primary} />}
                 </TouchableOpacity>
               )}
-              ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />}
+              ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.nomad.outlineVariant, marginHorizontal: spacing.lg }} />}
             />
           </SafeAreaView>
         </View>
@@ -466,84 +466,84 @@ export default function CreateTripScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: colors.bgScreen },
+  screen:         { flex: 1, backgroundColor: colors.nomad.background },
 
   // Header
-  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bgCard },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.surfaceContainerLow },
   headerBack:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.nomad.onSurface },
 
   // Step indicator
-  stepRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.lg, backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  stepRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.lg, backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   stepItem:       { flexDirection: 'row', alignItems: 'center' },
-  stepDot:        { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgScreen },
-  stepDotActive:  { borderColor: colors.primary600, backgroundColor: colors.primary600 },
-  stepDotDone:    { borderColor: colors.secondary600, backgroundColor: colors.secondary600 },
-  stepNum:        { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  stepLine:       { width: 44, height: 1.5, backgroundColor: colors.border, marginHorizontal: 4 },
-  stepLineDone:   { backgroundColor: colors.secondary600 },
+  stepDot:        { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.nomad.background },
+  stepDotActive:  { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.primary },
+  stepDotDone:    { borderColor: colors.nomad.secondary, backgroundColor: colors.nomad.secondary },
+  stepNum:        { fontSize: 11, fontWeight: '700', color: colors.nomad.onSurfaceVariant },
+  stepLine:       { width: 44, height: 1.5, backgroundColor: colors.nomad.outlineVariant, marginHorizontal: 4 },
+  stepLineDone:   { backgroundColor: colors.nomad.secondary },
 
   // Error
   errorBox:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', padding: 12, marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: radius.md },
   errorText:      { flex: 1, color: colors.error, fontSize: 13 },
 
   stepContent:    { paddingTop: spacing.lg },
-  sectionLabel:   { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  sectionLabel:   { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: spacing.md },
 
   // Inputs
-  inputLabel:     { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
-  input:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgCard },
+  inputLabel:     { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurfaceVariant, marginBottom: 6 },
+  input:          { borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.nomad.onSurface, backgroundColor: colors.nomad.surfaceContainerLow },
   destPicker:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  destPickerText: { fontSize: 15, color: colors.textPrimary, flex: 1 },
-  destPickerPlaceholder: { fontSize: 15, color: colors.textMuted, flex: 1 },
+  destPickerText: { fontSize: 15, color: colors.nomad.onSurface, flex: 1 },
+  destPickerPlaceholder: { fontSize: 15, color: colors.nomad.onSurfaceVariant, flex: 1 },
 
   // Method cards
-  methodCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bgCard, marginBottom: 12 },
-  methodIcon:     { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  methodTitle:    { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
-  methodDesc:     { fontSize: 12, color: colors.textMuted, lineHeight: 17 },
+  methodCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.surfaceContainerLow, marginBottom: 12 },
+  methodIcon:     { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
+  methodTitle:    { fontSize: 16, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: 2 },
+  methodDesc:     { fontSize: 12, color: colors.nomad.onSurfaceVariant, lineHeight: 17 },
 
   // Chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard },
-  chipActive:     { borderColor: colors.primary600, backgroundColor: colors.primary100 },
-  chipText:       { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  chipTextActive: { color: colors.primary600, fontWeight: '700' },
+  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.surfaceContainerLow },
+  chipActive:     { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  chipText:       { fontSize: 13, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  chipTextActive: { color: colors.nomad.primary, fontWeight: '700' },
 
   // Stepper
-  stepper:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
-  stepperBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgCard },
-  stepperVal:     { paddingHorizontal: 20, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  stepper:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
+  stepperBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.nomad.surfaceContainerLow },
+  stepperVal:     { paddingHorizontal: 20, fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface },
 
   // Checkbox
   checkRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: spacing.md },
-  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked:{ backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  checkLabel:     { fontSize: 14, color: colors.textPrimary },
+  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked:{ backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
+  checkLabel:     { fontSize: 14, color: colors.nomad.onSurface },
 
   // Date
   dateHint:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
-  dateHintText:   { fontSize: 12, color: colors.textMuted },
+  dateHintText:   { fontSize: 12, color: colors.nomad.onSurfaceVariant },
 
   // Province picker
   overlay:               { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  provinceModal:         { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
-  modalHandle:           { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
+  provinceModal:         { backgroundColor: colors.nomad.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
+  modalHandle:           { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.nomad.outlineVariant, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
   provinceHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  provinceTitle:         { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
-  provinceSearchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.bgScreen },
-  provinceSearchInput:   { flex: 1, fontSize: 14, color: colors.textPrimary },
+  provinceTitle:         { fontSize: 18, fontWeight: '800', color: colors.nomad.onSurface },
+  provinceSearchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.nomad.background },
+  provinceSearchInput:   { flex: 1, fontSize: 14, color: colors.nomad.onSurface },
   provinceItem:          { paddingHorizontal: spacing.lg, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  provinceItemActive:    { backgroundColor: colors.primary100 },
-  provinceItemText:      { fontSize: 15, color: colors.textPrimary },
-  provinceItemTextActive:{ color: colors.primary600, fontWeight: '700' },
+  provinceItemActive:    { backgroundColor: colors.nomad.secondaryContainer },
+  provinceItemText:      { fontSize: 15, color: colors.nomad.onSurface },
+  provinceItemTextActive:{ color: colors.nomad.primary, fontWeight: '700' },
 
   // AI loading screen
-  loadingScreen:    { flex: 1, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  loadingScreen:    { flex: 1, backgroundColor: colors.nomad.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   loadingContent:   { alignItems: 'center', maxWidth: 320 },
-  loadingIconWrap:  { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  loadingTitle:     { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
-  loadingSubtitle:  { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },
-  logBox:           { marginTop: spacing.xl, width: '100%', backgroundColor: colors.bgCard, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: 6 },
-  logLine:          { fontSize: 13, color: colors.textMuted, lineHeight: 19 },
+  loadingIconWrap:  { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  loadingTitle:     { fontSize: 22, fontWeight: '800', color: colors.nomad.onSurface, textAlign: 'center', marginBottom: spacing.sm },
+  loadingSubtitle:  { fontSize: 14, color: colors.nomad.onSurfaceVariant, textAlign: 'center', lineHeight: 21 },
+  logBox:           { marginTop: spacing.xl, width: '100%', backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.nomad.outlineVariant, gap: 6 },
+  logLine:          { fontSize: 13, color: colors.nomad.onSurfaceVariant, lineHeight: 19 },
 });

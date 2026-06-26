@@ -29,16 +29,16 @@ export function Button({ label, onPress, variant = 'primary', size = 'md', loadi
   const containerStyle: ViewStyle[] = [
     styles.base,
     padding[size],
-    variant === 'primary' && { backgroundColor: isDisabled ? colors.primary400 : colors.primary600 },
-    variant === 'outline' && { borderWidth: 1.5, borderColor: colors.primary600 },
+    variant === 'primary' && { backgroundColor: isDisabled ? colors.nomad.primaryContainer : colors.nomad.primary },
+    variant === 'outline' && { borderWidth: 1.5, borderColor: colors.nomad.primary },
     variant === 'ghost'   && {},
     style as ViewStyle,
   ];
 
   const textColor =
-    variant === 'primary' ? colors.textOnDark :
-    variant === 'outline' ? colors.primary600 :
-    colors.primary600;
+    variant === 'primary' ? colors.nomad.onPrimary :
+    variant === 'outline' ? colors.nomad.primary :
+    colors.nomad.primary;
 
   return (
     <TouchableOpacity
@@ -48,7 +48,7 @@ export function Button({ label, onPress, variant = 'primary', size = 'md', loadi
       activeOpacity={0.8}
     >
       {loading
-        ? <ActivityIndicator color={variant === 'primary' ? colors.textOnDark : colors.primary600} />
+        ? <ActivityIndicator color={variant === 'primary' ? colors.nomad.onPrimary : colors.nomad.primary} />
         : <Text style={[styles.label, { fontSize: fontSize[size], color: textColor }]}>{label}</Text>
       }
     </TouchableOpacity>

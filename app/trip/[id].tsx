@@ -170,8 +170,8 @@ export default function TripDetailScreen() {
         e.location.toLowerCase().includes(expSearch.toLowerCase()))
     : mockExperiences;
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary600} /></View>;
-  if (!trip)   return <View style={styles.center}><Text style={{ color: colors.textMuted }}>Trip không tìm thấy</Text></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.nomad.primary} /></View>;
+  if (!trip)   return <View style={styles.center}><Text style={{ color: colors.nomad.onSurfaceVariant }}>Trip không tìm thấy</Text></View>;
 
   // Group items by day
   const dayNumbers = Array.from(new Set(items.map((i) => i.day_number))).sort((a, b) => a - b);
@@ -195,7 +195,7 @@ export default function TripDetailScreen() {
       {/* ── Top bar ── */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={20} color={colors.nomad.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle} numberOfLines={1}>{trip.title}</Text>
         <Badge label={STATUS_LABEL[trip.status]} color={STATUS_COLOR[trip.status]} />
@@ -273,11 +273,11 @@ export default function TripDetailScreen() {
 
             {dayItems.length === 0 ? (
               <View style={styles.emptyWrap}>
-                <Ionicons name="map-outline" size={56} color={colors.border} />
+                <Ionicons name="map-outline" size={56} color={colors.nomad.outlineVariant} />
                 <Text style={styles.emptyTitle}>Chưa có địa điểm</Text>
                 <Text style={styles.emptyBody}>Nhấn nút + bên dưới để thêm vào ngày {selectedDay}</Text>
                 <TouchableOpacity style={styles.addInlineBtn} onPress={openAddExp}>
-                  <Ionicons name="add-circle-outline" size={18} color={colors.textOnDark} />
+                  <Ionicons name="add-circle-outline" size={18} color={colors.nomad.onPrimary} />
                   <Text style={styles.addInlineBtnText}>Thêm địa điểm</Text>
                 </TouchableOpacity>
               </View>
@@ -314,7 +314,7 @@ export default function TripDetailScreen() {
                         <View style={styles.tlCardHeader}>
                           <Text style={styles.tlTitle} numberOfLines={2}>{title}</Text>
                           <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.tlDeleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
+                            <Ionicons name="trash-outline" size={14} color={colors.nomad.onSurfaceVariant} />
                           </TouchableOpacity>
                         </View>
                         {locLabel && (
@@ -342,7 +342,7 @@ export default function TripDetailScreen() {
 
           {/* FAB */}
           <TouchableOpacity style={styles.fab} onPress={openAddExp} activeOpacity={0.85}>
-            <Ionicons name="add" size={26} color={colors.textOnDark} />
+            <Ionicons name="add" size={26} color={colors.nomad.onPrimary} />
           </TouchableOpacity>
         </View>
       )}
@@ -382,7 +382,7 @@ export default function TripDetailScreen() {
               style={styles.journalInput}
               multiline numberOfLines={4}
               placeholder="Hôm nay bạn đã khám phá được gì?"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.nomad.onSurfaceVariant}
               value={journalContent}
               onChangeText={setJournalContent}
               textAlignVertical="top"
@@ -461,7 +461,7 @@ export default function TripDetailScreen() {
                   </View>
                   <Text style={[styles.packingItemText, item.is_packed && styles.packingItemTextDone]}>{item.name}</Text>
                   <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.packingDeleteBtn}>
-                    <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name="trash-outline" size={14} color={colors.nomad.onSurfaceVariant} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))
@@ -470,14 +470,14 @@ export default function TripDetailScreen() {
               <TextInput
                 style={styles.packingInput}
                 placeholder="Thêm vật dụng..."
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={colors.nomad.onSurfaceVariant}
                 value={newPackingItem}
                 onChangeText={setNewPackingItem}
                 returnKeyType="done"
                 onSubmitEditing={async () => { if (!newPackingItem.trim()) return; await addItem(newPackingItem.trim()); setNewPackingItem(''); }}
               />
               <TouchableOpacity style={styles.packingAddBtn} onPress={async () => { if (!newPackingItem.trim()) return; await addItem(newPackingItem.trim()); setNewPackingItem(''); }}>
-                <Ionicons name="add" size={20} color={colors.textOnDark} />
+                <Ionicons name="add" size={20} color={colors.nomad.onPrimary} />
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -492,7 +492,7 @@ export default function TripDetailScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{pickedExp ? 'Chọn ngày & thời điểm' : 'Thêm địa điểm'}</Text>
               <TouchableOpacity onPress={pickedExp ? () => setPickedExp(null) : closeAddExp}>
-                <Ionicons name={pickedExp ? 'arrow-back-outline' : 'close'} size={22} color={colors.textMuted} />
+                <Ionicons name={pickedExp ? 'arrow-back-outline' : 'close'} size={22} color={colors.nomad.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
 
@@ -506,11 +506,11 @@ export default function TripDetailScreen() {
             {!pickedExp ? (
               <>
                 <View style={styles.searchBar}>
-                  <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+                  <Ionicons name="search-outline" size={16} color={colors.nomad.onSurfaceVariant} />
                   <TextInput
                     style={styles.searchInput}
                     placeholder="Tìm trải nghiệm..."
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={colors.nomad.onSurfaceVariant}
                     value={expSearch}
                     onChangeText={setExpSearch}
                   />
@@ -528,7 +528,7 @@ export default function TripDetailScreen() {
                         <Text style={styles.expOptionSub}>📍 {item.location}</Text>
                         <Text style={styles.expOptionCat}>{CATEGORY_CONFIG[item.category]?.label ?? item.category} · ⭐ {item.rating}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                      <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
                     </TouchableOpacity>
                   )}
                 />
@@ -566,7 +566,7 @@ export default function TripDetailScreen() {
                 <TextInput
                   style={styles.noteInput}
                   placeholder="Đặt vé trước / Mang theo đồ..."
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.nomad.onSurfaceVariant}
                   value={addNote}
                   onChangeText={setAddNote}
                   multiline numberOfLines={2}
@@ -584,46 +584,46 @@ export default function TripDetailScreen() {
   );
 }
 
-const DAY_HEADER_BG = '#2D1A0E';   // colors.textPrimary — giữ palette cũ
-const DOT_COLOR     = '#C8602E';   // colors.primary600
-const LINE_COLOR    = '#F5E4D6';   // colors.primary100
-const TAG_BG        = '#F5E4D6';   // colors.primary100
-const TAG_TEXT      = '#C8602E';   // colors.primary600
+const DAY_HEADER_BG = colors.nomad.inverseSurface;
+const DOT_COLOR     = colors.nomad.primary;
+const LINE_COLOR    = colors.nomad.secondaryContainer;
+const TAG_BG        = colors.nomad.secondaryContainer;
+const TAG_TEXT      = colors.nomad.primary;
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: colors.bgScreen },
+  container:   { flex: 1, backgroundColor: colors.nomad.background },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Top bar
-  topBar:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.sm, backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backBtn:      { width: 36, height: 36, borderRadius: radius.lg, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  topBarTitle:  { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  topBar:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.sm, backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  backBtn:      { width: 36, height: 36, borderRadius: radius.lg, backgroundColor: colors.nomad.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  topBarTitle:  { flex: 1, fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface },
 
   // Info header
-  infoHeader:       { backgroundColor: colors.bgCard, paddingHorizontal: spacing.lg, paddingTop: 16, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
-  infoHeaderLabel:  { fontSize: 11, fontWeight: '700', color: colors.primary600, letterSpacing: 1, marginBottom: 4 },
-  infoHeaderTitle:  { fontSize: 22, fontWeight: '800', color: colors.textPrimary, lineHeight: 28, marginBottom: 4 },
-  infoHeaderDates:  { fontSize: 13, color: colors.textMuted, marginBottom: 14 },
-  statsRow:         { flexDirection: 'row', backgroundColor: colors.bgScreen, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  infoHeader:       { backgroundColor: colors.nomad.surfaceContainerLow, paddingHorizontal: spacing.lg, paddingTop: 16, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  infoHeaderLabel:  { fontSize: 11, fontWeight: '700', color: colors.nomad.primary, letterSpacing: 1, marginBottom: 4 },
+  infoHeaderTitle:  { fontSize: 22, fontWeight: '800', color: colors.nomad.onSurface, lineHeight: 28, marginBottom: 4 },
+  infoHeaderDates:  { fontSize: 13, color: colors.nomad.onSurfaceVariant, marginBottom: 14 },
+  statsRow:         { flexDirection: 'row', backgroundColor: colors.nomad.background, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, overflow: 'hidden' },
   statChip:         { flex: 1, alignItems: 'center', paddingVertical: 10 },
-  statValue:        { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
-  statUnit:         { fontSize: 11, color: colors.primary600, fontWeight: '600' },
-  statLabel:        { fontSize: 10, color: colors.textMuted, marginTop: 1 },
-  statDivider:      { width: 1, backgroundColor: colors.border },
+  statValue:        { fontSize: 18, fontWeight: '800', color: colors.nomad.onSurface },
+  statUnit:         { fontSize: 11, color: colors.nomad.primary, fontWeight: '600' },
+  statLabel:        { fontSize: 10, color: colors.nomad.onSurfaceVariant, marginTop: 1 },
+  statDivider:      { width: 1, backgroundColor: colors.nomad.outlineVariant },
 
   // Tabs
-  tabs:         { flexDirection: 'row', backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabs:         { flexDirection: 'row', backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   tabBtn:       { flex: 1, paddingVertical: 11, alignItems: 'center' },
-  tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.primary600 },
-  tabText:      { fontSize: 12, fontWeight: '500', color: colors.textMuted },
-  tabTextActive:{ color: colors.primary600, fontWeight: '700' },
+  tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.nomad.primary },
+  tabText:      { fontSize: 12, fontWeight: '500', color: colors.nomad.onSurfaceVariant },
+  tabTextActive:{ color: colors.nomad.primary, fontWeight: '700' },
 
   // Day selector
-  dayTabsScroll:   { flexShrink: 0, flexGrow: 0, backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  dayTabsScroll:   { flexShrink: 0, flexGrow: 0, backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   dayTabsContent:  { paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 12, gap: 8, alignItems: 'center' },
-  dayTab:          { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border, alignSelf: 'center' },
+  dayTab:          { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.nomad.background, borderWidth: 1, borderColor: colors.nomad.outlineVariant, alignSelf: 'center' },
   dayTabActive:    { backgroundColor: DAY_HEADER_BG, borderColor: DAY_HEADER_BG },
-  dayTabText:      { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  dayTabText:      { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurfaceVariant },
   dayTabTextActive:{ color: '#fff' },
 
   // Day header card
@@ -637,103 +637,103 @@ const styles = StyleSheet.create({
   tlRow:        { flexDirection: 'row', marginBottom: 0 },
 
   // Time column
-  tlTime: { width: 46, fontSize: 12, color: colors.textMuted, fontWeight: '500', paddingTop: 14, textAlign: 'right', paddingRight: 8 },
+  tlTime: { width: 46, fontSize: 12, color: colors.nomad.onSurfaceVariant, fontWeight: '500', paddingTop: 14, textAlign: 'right', paddingRight: 8 },
 
   // Dot + line column
   tlMiddle: { width: 24, alignItems: 'center' },
-  tlDot:    { width: 12, height: 12, borderRadius: 6, backgroundColor: DOT_COLOR, marginTop: 12, borderWidth: 2, borderColor: colors.bgCard, elevation: 2 },
+  tlDot:    { width: 12, height: 12, borderRadius: 6, backgroundColor: DOT_COLOR, marginTop: 12, borderWidth: 2, borderColor: colors.nomad.surfaceContainerLow, elevation: 2 },
   tlLine:   { width: 2, flex: 1, backgroundColor: LINE_COLOR, marginTop: 2 },
 
   // Card
-  tlCard:       { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginLeft: 10, marginBottom: 12, padding: 12, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3 },
+  tlCard:       { flex: 1, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, marginLeft: 10, marginBottom: 12, padding: 12, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3 },
   tlCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4 },
-  tlTitle:      { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
+  tlTitle:      { flex: 1, fontSize: 14, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 20 },
   tlDeleteBtn:  { padding: 2 },
-  tlLoc:        { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
-  tlDesc:       { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: 8 },
+  tlLoc:        { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginBottom: 4 },
+  tlDesc:       { fontSize: 12, color: colors.nomad.onSurfaceVariant, lineHeight: 17, marginBottom: 8 },
   tlTags:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tlTag:        { backgroundColor: TAG_BG, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
   tlTagText:    { fontSize: 11, color: TAG_TEXT, fontWeight: '600' },
 
   // Empty
   emptyWrap:       { alignItems: 'center', paddingTop: 48, paddingBottom: 32, paddingHorizontal: spacing.xl },
-  emptyTitle:      { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' },
-  emptyBody:       { fontSize: 13, color: colors.textMuted, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
-  addInlineBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary600, paddingHorizontal: 20, paddingVertical: 11, borderRadius: radius.xl, marginTop: spacing.lg },
-  addInlineBtnText:{ color: colors.textOnDark, fontWeight: '700', fontSize: 14 },
+  emptyTitle:      { fontSize: 16, fontWeight: '700', color: colors.nomad.onSurface, marginTop: spacing.md, textAlign: 'center' },
+  emptyBody:       { fontSize: 13, color: colors.nomad.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center', lineHeight: 20 },
+  addInlineBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 11, borderRadius: radius.xl, marginTop: spacing.lg },
+  addInlineBtnText:{ color: colors.nomad.onPrimary, fontWeight: '700', fontSize: 14 },
 
   // FAB
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 54, height: 54, borderRadius: 27, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
 
   // Journal
-  journalCard:    { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
+  journalCard:    { backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, padding: spacing.md, marginBottom: spacing.md },
   journalHeader:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  journalDay:     { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  journalContent: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
-  journalForm:    { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginTop: spacing.md },
-  formLabel:      { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
-  dayBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  dayBtnActive:   { backgroundColor: colors.primary600 },
-  dayBtnText:     { fontSize: 13, fontWeight: '500', color: colors.primary600 },
-  dayBtnTextActive:{ color: colors.textOnDark },
-  journalInput:   { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 100, marginBottom: spacing.md },
+  journalDay:     { fontSize: 12, fontWeight: '600', color: colors.nomad.onSurfaceVariant },
+  journalContent: { fontSize: 14, color: colors.nomad.onSurface, lineHeight: 20 },
+  journalForm:    { backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, padding: spacing.md, marginTop: spacing.md },
+  formLabel:      { fontSize: 14, fontWeight: '600', color: colors.nomad.onSurface, marginBottom: spacing.sm },
+  dayBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
+  dayBtnActive:   { backgroundColor: colors.nomad.primary },
+  dayBtnText:     { fontSize: 13, fontWeight: '500', color: colors.nomad.primary },
+  dayBtnTextActive:{ color: colors.nomad.onPrimary },
+  journalInput:   { borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.nomad.onSurface, minHeight: 100, marginBottom: spacing.md },
 
   // Info
-  infoRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  infoLabel: { fontSize: 13, color: colors.textMuted },
-  infoValue: { fontSize: 13, fontWeight: '500', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
+  infoRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  infoLabel: { fontSize: 13, color: colors.nomad.onSurfaceVariant },
+  infoValue: { fontSize: 13, fontWeight: '500', color: colors.nomad.onSurface, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
 
   // Packing
-  packingProgress:      { backgroundColor: colors.bgCard, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  packingProgress:      { backgroundColor: colors.nomad.surfaceContainerLow, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   packingProgressRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  packingProgressLabel: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  packingPercent:       { fontSize: 13, fontWeight: '700', color: colors.primary600 },
-  progressTrack:        { height: 6, borderRadius: 3, backgroundColor: colors.border },
-  progressFill:         { height: 6, borderRadius: 3, backgroundColor: colors.primary600 },
+  packingProgressLabel: { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurface },
+  packingPercent:       { fontSize: 13, fontWeight: '700', color: colors.nomad.primary },
+  progressTrack:        { height: 6, borderRadius: 3, backgroundColor: colors.nomad.outlineVariant },
+  progressFill:         { height: 6, borderRadius: 3, backgroundColor: colors.nomad.primary },
   templateSection:      { marginBottom: spacing.lg },
-  templateLabel:        { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  templateChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border },
-  templateChipText:     { fontSize: 13, color: colors.textPrimary, fontWeight: '500' },
+  templateLabel:        { fontSize: 12, fontWeight: '700', color: colors.nomad.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  templateChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.nomad.surfaceContainerLow, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  templateChipText:     { fontSize: 13, color: colors.nomad.onSurface, fontWeight: '500' },
   packingEmpty:         { alignItems: 'center', paddingTop: 40, paddingBottom: 20 },
-  packingItem:          { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bgCard, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginBottom: 8 },
-  checkbox:             { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  packingItem:          { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.md, borderWidth: 1, borderColor: colors.nomad.outlineVariant, padding: spacing.sm, marginBottom: 8 },
+  checkbox:             { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.nomad.outlineVariant, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked:      { backgroundColor: '#22C55E', borderColor: '#22C55E' },
-  packingItemText:      { flex: 1, fontSize: 14, color: colors.textPrimary },
-  packingItemTextDone:  { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+  packingItemText:      { flex: 1, fontSize: 14, color: colors.nomad.onSurface },
+  packingItemTextDone:  { textDecorationLine: 'line-through', color: colors.nomad.onSurfaceVariant, opacity: 0.6 },
   packingDeleteBtn:     { padding: 4 },
   packingAddRow:        { flexDirection: 'row', gap: 8, marginTop: spacing.md },
-  packingInput:         { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.bgCard },
-  packingAddBtn:        { width: 42, height: 42, borderRadius: radius.lg, backgroundColor: colors.primary600, alignItems: 'center', justifyContent: 'center' },
+  packingInput:         { flex: 1, borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.nomad.onSurface, backgroundColor: colors.nomad.surfaceContainerLow },
+  packingAddBtn:        { width: 42, height: 42, borderRadius: radius.lg, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
 
   // Modal
   modalOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet:     { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
-  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.md },
+  modalSheet:     { backgroundColor: colors.nomad.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
+  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.nomad.outlineVariant, alignSelf: 'center', marginBottom: spacing.md },
   modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle:     { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  modalTitle:     { fontSize: 18, fontWeight: '800', color: colors.nomad.onSurface },
   errorBox:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
   errorText:      { flex: 1, color: colors.error, fontSize: 12 },
-  searchBar:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, marginBottom: spacing.md, backgroundColor: colors.bgScreen },
-  searchInput:    { flex: 1, fontSize: 14, color: colors.textPrimary },
-  expOption:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  searchBar:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 10, marginBottom: spacing.md, backgroundColor: colors.nomad.background },
+  searchInput:    { flex: 1, fontSize: 14, color: colors.nomad.onSurface },
+  expOption:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   expOptionImg:   { width: 56, height: 56, borderRadius: radius.md, resizeMode: 'cover' },
-  expOptionTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  expOptionSub:   { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  expOptionCat:   { fontSize: 11, color: colors.primary600, marginTop: 2 },
-  pickedExpCard:  { flexDirection: 'row', gap: 10, backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
+  expOptionTitle: { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurface },
+  expOptionSub:   { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
+  expOptionCat:   { fontSize: 11, color: colors.nomad.primary, marginTop: 2 },
+  pickedExpCard:  { flexDirection: 'row', gap: 10, backgroundColor: colors.nomad.background, borderRadius: radius.md, padding: 10, marginBottom: spacing.lg, alignItems: 'center' },
   pickedExpImg:   { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
-  pickedExpTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  pickedExpLoc:   { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  stepLabel:      { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  dayChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  dayChipActive:  { backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  dayChipText:    { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  dayChipTextActive: { color: colors.textOnDark },
+  pickedExpTitle: { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurface },
+  pickedExpLoc:   { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
+  stepLabel:      { fontSize: 12, fontWeight: '700', color: colors.nomad.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  dayChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.nomad.background, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  dayChipActive:  { backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
+  dayChipText:    { fontSize: 13, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  dayChipTextActive: { color: colors.nomad.onPrimary },
   slotRow:        { flexDirection: 'row', gap: 8 },
-  slotBtn:        { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  slotBtnActive:  { borderColor: colors.primary600, backgroundColor: colors.primary100 },
+  slotBtn:        { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.background },
+  slotBtnActive:  { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
   slotIcon:       { fontSize: 18, marginBottom: 4 },
-  slotLabel:      { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  slotLabelActive:{ color: colors.primary600 },
-  noteInput:      { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 60, backgroundColor: colors.bgScreen },
+  slotLabel:      { fontSize: 12, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  slotLabelActive:{ color: colors.nomad.primary },
+  noteInput:      { borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.nomad.onSurface, minHeight: 60, backgroundColor: colors.nomad.background },
 });

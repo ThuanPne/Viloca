@@ -1,23 +1,60 @@
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const PILL_HEIGHT = 32;
+
+function PillIcon({ name, focused, size }: { name: IoniconName; focused: boolean; size: number }) {
+  if (focused) {
+    return (
+      <View
+        style={{
+          width: size + 32,
+          height: PILL_HEIGHT,
+          backgroundColor: colors.nomad.secondaryContainer,
+          borderRadius: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name={name} size={size} color={colors.nomad.primary} />
+      </View>
+    );
+  }
+  return <Ionicons name={name} size={size} color={colors.nomad.onSurfaceVariant} />;
+}
 
 export default function AppLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary600,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.bgCard, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.nomad.primary,
+        tabBarInactiveTintColor: colors.nomad.onSurfaceVariant,
+        tabBarIconStyle: {
+          height: PILL_HEIGHT,
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        tabBarStyle: {
+          backgroundColor: colors.nomad.surface,
+          borderTopColor: colors.nomad.outlineVariant,
+          height: 68,
+          paddingTop: 4,
+          paddingBottom: 12,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Trang chủ',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          tabBarIcon: ({ focused, size }) => (
+            <PillIcon name={focused ? 'home' : 'home-outline'} focused={focused} size={size} />
           ),
         }}
       />
@@ -25,8 +62,8 @@ export default function AppLayout() {
         name="explore"
         options={{
           title: 'Khám phá',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={size} color={color} />
+          tabBarIcon: ({ focused, size }) => (
+            <PillIcon name={focused ? 'compass' : 'compass-outline'} focused={focused} size={size} />
           ),
         }}
       />
@@ -34,8 +71,8 @@ export default function AppLayout() {
         name="workspace"
         options={{
           title: 'Chuyến đi',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={size} color={color} />
+          tabBarIcon: ({ focused, size }) => (
+            <PillIcon name={focused ? 'map' : 'map-outline'} focused={focused} size={size} />
           ),
         }}
       />
@@ -43,8 +80,8 @@ export default function AppLayout() {
         name="profile"
         options={{
           title: 'Hồ sơ',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          tabBarIcon: ({ focused, size }) => (
+            <PillIcon name={focused ? 'person' : 'person-outline'} focused={focused} size={size} />
           ),
         }}
       />

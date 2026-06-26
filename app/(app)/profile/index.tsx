@@ -87,7 +87,7 @@ export default function ProfileScreen() {
             style={styles.editBtn}
             onPress={() => router.push('/(app)/profile/edit')}
           >
-            <Ionicons name="pencil-outline" size={14} color={colors.primary600} />
+            <Ionicons name="pencil-outline" size={14} color={colors.nomad.primary} />
             <Text style={styles.editText}>Chỉnh sửa hồ sơ</Text>
           </TouchableOpacity>
         </View>
@@ -128,7 +128,7 @@ export default function ProfileScreen() {
           {/* Experience cards */}
           {savedItems.length === 0 ? (
             <View style={styles.savedEmpty}>
-              <Ionicons name="heart-outline" size={32} color={colors.border} />
+              <Ionicons name="heart-outline" size={32} color={colors.nomad.outlineVariant} />
               <Text style={styles.savedEmptyText}>Chưa có địa điểm nào</Text>
             </View>
           ) : (
@@ -168,13 +168,13 @@ export default function ProfileScreen() {
             >
               <View style={styles.menuLeft}>
                 <View style={styles.menuIcon}>
-                  <Ionicons name={item.icon as any} size={18} color={colors.primary600} />
+                  <Ionicons name={item.icon as any} size={18} color={colors.nomad.primary} />
                 </View>
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </View>
               <View style={styles.menuRight}>
                 {item.value && <Text style={styles.menuValue}>{item.value}</Text>}
-                <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
               </View>
             </TouchableOpacity>
           ))}
@@ -194,37 +194,37 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   hero:          { alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
-  name:          { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: 12 },
-  email:         { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.primary600, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
-  editText:      { fontSize: 13, fontWeight: '500', color: colors.primary600 },
-  statsRow:      { flexDirection: 'row', marginHorizontal: spacing.lg, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  name:          { fontSize: 22, fontWeight: '700', color: colors.nomad.onSurface, marginTop: 12 },
+  email:         { fontSize: 13, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
+  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
+  editText:      { fontSize: 13, fontWeight: '500', color: colors.nomad.primary },
+  statsRow:      { flexDirection: 'row', marginHorizontal: spacing.lg, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, padding: spacing.md },
   statItem:      { flex: 1, alignItems: 'center' },
-  statValue:     { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  statLabel:     { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  statValue:     { fontSize: 20, fontWeight: '700', color: colors.nomad.onSurface },
+  statLabel:     { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
   savedSection:      { marginTop: spacing.lg, paddingHorizontal: spacing.lg },
-  savedTitle:        { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  savedTitle:        { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: spacing.md },
   savedTabs:         { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  savedTabBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border },
-  savedTabBtnActive: { backgroundColor: colors.primary600, borderColor: colors.primary600 },
-  savedTabText:      { fontSize: 12, fontWeight: '500', color: colors.textMuted },
-  savedTabTextActive:{ color: colors.textOnDark, fontWeight: '600' },
+  savedTabBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.nomad.surfaceContainerLow, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  savedTabBtnActive: { backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
+  savedTabText:      { fontSize: 12, fontWeight: '500', color: colors.nomad.onSurfaceVariant },
+  savedTabTextActive:{ color: colors.nomad.onPrimary, fontWeight: '600' },
   savedEmpty:        { alignItems: 'center', paddingVertical: 28, gap: 8 },
-  savedEmptyText:    { fontSize: 13, color: colors.textMuted },
-  savedCard:         { width: 160, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  savedEmptyText:    { fontSize: 13, color: colors.nomad.onSurfaceVariant },
+  savedCard:         { width: 160, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, overflow: 'hidden' },
   savedCardImg:      { width: '100%', height: 100, resizeMode: 'cover' },
   savedCardInfo:     { padding: spacing.sm, gap: 3 },
-  savedCardTitle:    { fontSize: 12, fontWeight: '600', color: colors.textPrimary, lineHeight: 16 },
-  savedCardLoc:      { fontSize: 11, color: colors.textMuted },
-  savedCardPrice:    { fontSize: 12, fontWeight: '600', color: colors.primary600, marginTop: 2 },
-  menuSection:   { marginTop: spacing.lg, marginHorizontal: spacing.lg, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  savedCardTitle:    { fontSize: 12, fontWeight: '600', color: colors.nomad.onSurface, lineHeight: 16 },
+  savedCardLoc:      { fontSize: 11, color: colors.nomad.onSurfaceVariant },
+  savedCardPrice:    { fontSize: 12, fontWeight: '600', color: colors.nomad.primary, marginTop: 2 },
+  menuSection:   { marginTop: spacing.lg, marginHorizontal: spacing.lg, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
   menuRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: spacing.md },
-  menuBorder:    { borderTopWidth: 1, borderTopColor: colors.border },
+  menuBorder:    { borderTopWidth: 1, borderTopColor: colors.nomad.outlineVariant },
   menuLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  menuIcon:      { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:     { fontSize: 14, color: colors.textPrimary },
+  menuIcon:      { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:     { fontSize: 14, color: colors.nomad.onSurface },
   menuRight:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  menuValue:     { fontSize: 12, color: colors.textMuted },
+  menuValue:     { fontSize: 12, color: colors.nomad.onSurfaceVariant },
   signOutSection:{ margin: spacing.lg },
   signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 14, borderRadius: radius.lg },
   signOutText:   { fontSize: 15, fontWeight: '600', color: colors.error },
