@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import supabase from '@/src/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius, shadow } from '@/src/theme/spacing';
