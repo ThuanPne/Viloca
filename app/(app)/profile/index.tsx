@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
@@ -57,7 +58,20 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Hero */}
         <View style={styles.hero}>
-          <Avatar name={name} size={80} />
+          {/* Gradient band */}
+          <LinearGradient
+            colors={[colors.nomad.primary, colors.nomad.primaryContainer]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.heroBand}
+          />
+          {/* Decorative blobs */}
+          <View style={styles.blobTopRight} />
+          <View style={styles.blobBottomLeft} />
+
+          {/* Avatar with white ring */}
+          <View style={styles.avatarRing}>
+            <Avatar name={name} size={80} />
+          </View>
           <Text style={styles.name}>{name}</Text>
           <Text style={styles.email}>{email}</Text>
           <TouchableOpacity
@@ -116,10 +130,39 @@ export default function ProfileScreen() {
 
 const n = colors.nomad;
 const styles = StyleSheet.create({
-  hero:          { alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
-  name:          { fontSize: 22, fontWeight: '700', color: n.onSurface, marginTop: 12 },
-  email:         { fontSize: 13, color: n.onSurfaceVariant, marginTop: 2 },
-  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: n.primary, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
+  hero: {
+    alignItems: 'center',
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    overflow: 'hidden',
+  },
+  heroBand: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 120,
+  },
+  blobTopRight: {
+    position: 'absolute', top: -20, right: -30,
+    width: 130, height: 130, borderRadius: 65,
+    backgroundColor: '#fff', opacity: 0.08,
+  },
+  blobBottomLeft: {
+    position: 'absolute', top: 40, left: -40,
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: '#fff', opacity: 0.06,
+  },
+  avatarRing: {
+    marginTop: 40,
+    padding: 3,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  name:    { fontSize: 22, fontWeight: '700', color: n.onSurface, marginTop: 12 },
+  email:   { fontSize: 13, color: n.onSurfaceVariant, marginTop: 2 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: n.primary, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, marginTop: 12 },
   editText:      { fontSize: 13, fontWeight: '500', color: n.primary },
   statsRow:      { flexDirection: 'row', marginHorizontal: spacing.lg, backgroundColor: n.surfaceContainer, borderRadius: radius.lg, borderWidth: 1, borderColor: n.outlineVariant, padding: spacing.md },
   statItem:      { flex: 1, alignItems: 'center' },
