@@ -20,12 +20,6 @@ export function useLocationSearch() {
   const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
-    if (query.trim().length === 0 && cityCode === null) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     const timer = setTimeout(async () => {
       const { data } = await supabase.rpc('search_locations', {

@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
-  TouchableOpacity, ActivityIndicator, Image,
+  TouchableOpacity, ActivityIndicator, ImageBackground,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,8 @@ import { FilterSheet, FilterTab } from '@/src/components/home/FilterSheet';
 import { colors } from '@/src/theme/colors';
 import type { Location } from '@/src/types';
 
-const PRICE_LABEL: Record<number, string> = { 1: '₫', 2: '₫₫', 3: '₫₫₫', 4: '₫₫₫₫' };
+const INITIAL_COUNT = 5;
+const LOAD_MORE     = 7;
 
 // ─── Result card ─────────────────────────────────────────────────────────────
 function LocationResultCard({ location }: { location: Location }) {
@@ -27,16 +28,19 @@ function LocationResultCard({ location }: { location: Location }) {
       onPress={() => router.push(`/location/${location.id}`)}
     >
       {/* Thumbnail */}
-      <View style={styles.thumbnail}>
-        {firstPhoto ? (
-          <Image source={{ uri: firstPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-        ) : (
+      <ImageBackground
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={styles.thumbnail}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: 12 }}
+      >
+        {!firstPhoto && (
           <LinearGradient
             colors={[colors.nomad.primaryContainer, colors.nomad.primary]}
             style={StyleSheet.absoluteFillObject}
           />
         )}
-      </View>
+      </ImageBackground>
 
       {/* Info */}
       <View style={styles.cardInfo}>
@@ -45,16 +49,13 @@ function LocationResultCard({ location }: { location: Location }) {
           <Ionicons name="location-outline" size={11} color={colors.nomad.onSurfaceVariant} />
           <Text style={styles.cardSubtitle} numberOfLines={1}>{subtitle}</Text>
         </View>
-        <View style={styles.cardTags}>
-          {firstCategory ? (
+        {firstCategory ? (
+          <View style={styles.cardTags}>
             <View style={styles.categoryPill}>
               <Text style={styles.categoryPillText}>{firstCategory}</Text>
             </View>
-          ) : null}
-          {location.price_level ? (
-            <Text style={styles.priceText}>{PRICE_LABEL[location.price_level]}</Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
 
       <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
@@ -69,13 +70,20 @@ export default function SearchScreen() {
   const { query, setQuery, cityCode, setCityCode, results, loading } = useLocationSearch();
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetTab, setSheetTab]         = useState<FilterTab>('category');
+  const [displayCount, setDisplayCount] = useState(INITIAL_COUNT);
 
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
   }, []);
 
-  const isEmpty = query.trim().length === 0 && cityCode === null;
+  // Reset pagination on every new search
+  useEffect(() => {
+    setDisplayCount(INITIAL_COUNT);
+  }, [query, cityCode]);
+
+  const displayed = results.slice(0, displayCount);
+  const hasMore   = displayCount < results.length;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -139,12 +147,6 @@ export default function SearchScreen() {
       {/* ── Results ──────────────────────────────────────────────── */}
       {loading ? (
         <ActivityIndicator color={colors.nomad.primary} style={styles.loader} />
-      ) : isEmpty ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="search" size={48} color={colors.nomad.outlineVariant} />
-          <Text style={styles.emptyTitle}>Tìm địa điểm</Text>
-          <Text style={styles.emptyHint}>Gõ tên, quận, hoặc chọn thành phố{'\n'}Không cần dấu cũng tìm được</Text>
-        </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="location-outline" size={48} color={colors.nomad.outlineVariant} />
@@ -153,13 +155,25 @@ export default function SearchScreen() {
         </View>
       ) : (
         <FlatList
-          data={results}
+          data={displayed}
           keyExtractor={(l) => l.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => <LocationResultCard location={item} />}
+          ListFooterComponent={
+            hasMore ? (
+              <TouchableOpacity
+                style={styles.loadMoreBtn}
+                onPress={() => setDisplayCount((c) => c + LOAD_MORE)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.loadMoreText}>Xem thêm</Text>
+                <Ionicons name="chevron-down" size={14} color={colors.nomad.primary} />
+              </TouchableOpacity>
+            ) : null
+          }
         />
       )}
     </View>
@@ -225,5 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2,
   },
   categoryPillText: { fontSize: 11, fontWeight: '600', color: colors.nomad.onSurface },
-  priceText:        { fontSize: 12, color: colors.nomad.onSurfaceVariant, fontWeight: '600' },
+
+  // Load more
+  loadMoreBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 14, marginTop: 4,
+  },
+  loadMoreText: { fontSize: 14, fontWeight: '600', color: colors.nomad.primary },
 });

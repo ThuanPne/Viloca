@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity,
   ActivityIndicator, Linking,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -94,10 +94,12 @@ export default function LocationDetailScreen() {
   return (
     <View style={styles.screen}>
       {/* ── Hero ───────────────────────────────────────────────────── */}
-      <View style={styles.hero}>
-        {firstPhoto ? (
-          <Image source={{ uri: firstPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-        ) : (
+      <ImageBackground
+        source={firstPhoto ? { uri: firstPhoto } : undefined}
+        style={styles.hero}
+        resizeMode="cover"
+      >
+        {!firstPhoto && (
           <LinearGradient
             colors={[colors.nomad.primaryContainer, colors.nomad.primary]}
             style={StyleSheet.absoluteFillObject}
@@ -115,7 +117,7 @@ export default function LocationDetailScreen() {
         >
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
-      </View>
+      </ImageBackground>
 
       {/* ── Content ────────────────────────────────────────────────── */}
       <ScrollView
@@ -281,7 +283,7 @@ const styles = StyleSheet.create({
   notFound: { color: colors.nomad.onSurfaceVariant, fontSize: 15 },
 
   // Hero
-  hero:    { height: 300, backgroundColor: colors.nomad.surfaceContainer },
+  hero:    { width: '100%', height: 300, backgroundColor: colors.nomad.surfaceContainer },
   backBtn: {
     position: 'absolute', left: 16,
     width: 40, height: 40, borderRadius: 20,

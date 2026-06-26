@@ -21,8 +21,10 @@ export default function AppLayout() {
         tabBarStyle: {
           backgroundColor: colors.nomad.surface,
           borderTopColor: colors.nomad.outlineVariant,
+          borderTopWidth: 1,
           paddingTop: 4,
           height: 62,
+          elevation: 8,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
       }}
