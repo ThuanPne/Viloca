@@ -217,29 +217,34 @@ export default function WorkspaceScreen() {
   }
 
   async function createManual() {
-    if (creating) return;
+    if (creating || !user) return;
     setCreating(true);
     setError('');
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError('Phiên đăng nhập hết hạn'); setCreating(false); return; }
+    let created = false;
+    let tripId = '';
+    try {
+      const { data, error: err } = await supabase.from('trips').insert({
+        user_id:          user.id,
+        title:            title.trim(),
+        destination:      destination,
+        start_date:       startDate || null,
+        end_date:         endDate || null,
+        status:           'planning',
+        summary_note:     null,
+        cover_image:      null,
+        is_ai_generated:  false,
+      }).select().single();
 
-    const { data, error: err } = await supabase.from('trips').insert({
-      user_id:          session.user.id,
-      title:            title.trim(),
-      destination:      destination,
-      start_date:       startDate || null,
-      end_date:         endDate || null,
-      status:           'planning',
-      summary_note:     null,
-      cover_image:      null,
-      is_ai_generated:  false,
-    }).select().single();
-
-    setCreating(false);
-    if (err) { setError('Không thể tạo trip: ' + err.message); return; }
-    setTrips([data, ...trips]);
-    closeModal();
-    router.push(`/trip/${data.id}`);
+      if (err) { setError('Không thể tạo trip: ' + err.message); return; }
+      setTrips((prev) => [data, ...prev]);
+      tripId = data.id;
+      created = true;
+    } catch (err: any) {
+      setError('Lỗi kết nối mạng. Vui lòng thử lại.');
+    } finally {
+      setCreating(false);
+    }
+    if (created) { closeModal(); router.push(`/trip/${tripId}`); }
   }
 
   async function createWithAI() {
@@ -251,102 +256,104 @@ export default function WorkspaceScreen() {
     setAiLogs([]);
     setError('');
 
-
     const log = (msg: string) => setAiLogs((prev) => [...prev, msg]);
+    let tripId = '';
+    let success = false;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError('Phiên đăng nhập hết hạn'); setCreating(false); return; }
+    try {
+      if (!user) { setError('Phiên đăng nhập hết hạn'); return; }
 
-    // 1. Create trip record first
-    log('Đang tạo chuyến đi...');
-    const summaryParts = [
-      hasChildren   ? 'Có trẻ em / người lớn tuổi' : null,
-      accommodation ? `Lưu trú: ${accommodation}` : null,
-      transport     ? `Di chuyển: ${transport}` : null,
-      activityLevel ? `Mức độ: ${activityLevel}` : null,
-    ].filter(Boolean);
+      // 1. Create trip record
+      log('Đang tạo chuyến đi...');
+      const summaryParts = [
+        hasChildren   ? 'Có trẻ em / người lớn tuổi' : null,
+        accommodation ? `Lưu trú: ${accommodation}` : null,
+        transport     ? `Di chuyển: ${transport}` : null,
+        activityLevel ? `Mức độ: ${activityLevel}` : null,
+      ].filter(Boolean);
 
-    const { data: trip, error: tripErr } = await supabase.from('trips').insert({
-      user_id:          session.user.id,
-      title:            title.trim(),
-      destination:      destination,
-      start_date:       null,
-      end_date:         null,
-      status:           'planning',
-      summary_note:     summaryParts.length ? summaryParts.join(' · ') : null,
-      cover_image:      null,
-      is_ai_generated:  true,
-    }).select().single();
+      const { data: trip, error: tripErr } = await supabase.from('trips').insert({
+        user_id:          user.id,
+        title:            title.trim(),
+        destination:      destination,
+        start_date:       null,
+        end_date:         null,
+        status:           'planning',
+        summary_note:     summaryParts.length ? summaryParts.join(' · ') : null,
+        cover_image:      null,
+        is_ai_generated:  true,
+      }).select().single();
 
-    if (tripErr) { setError('Không thể tạo trip: ' + tripErr.message); setCreating(false); return; }
-    log(`✓ Đã tạo trip "${title.trim()}"`);
+      if (tripErr) { log(`✗ ${tripErr.message}`); setError('Không thể tạo trip.'); return; }
+      tripId = trip.id;
+      log(`✓ Đã tạo trip "${title.trim()}"`);
 
-    // 2. Call plan-trip Edge Function
-    log(`Đang gửi yêu cầu tới AI (${days} ngày, ${vibes.join(', ')})...`);
-    const { data: plan, error: fnErr } = await supabase.functions.invoke('plan-trip', {
-      body: {
-        destination,
-        days,
-        budget_per_person: budget,
-        group_size: groupSize,
-        vibes,
-        accommodation:    accommodation    || undefined,
-        transport:        transport        || undefined,
-        activity_level:   activityLevel    || undefined,
-        traveling_with:   travelingWith    || undefined,
-      },
-    });
+      // 2. Call plan-trip Edge Function
+      log(`Đang gửi yêu cầu tới AI (${days} ngày, ${vibes.join(', ')})...`);
+      const { data: plan, error: fnErr } = await supabase.functions.invoke('plan-trip', {
+        body: {
+          destination,
+          days,
+          budget_per_person: budget,
+          group_size: groupSize,
+          vibes,
+          accommodation:    accommodation    || undefined,
+          transport:        transport        || undefined,
+          activity_level:   activityLevel    || undefined,
+          traveling_with:   travelingWith    || undefined,
+        },
+      });
 
-    if (fnErr || !plan?.days) {
-      let detail = fnErr?.message ?? plan?.error ?? JSON.stringify(plan);
-      if (fnErr?.context) {
-        try { const b = await (fnErr.context as Response).json(); detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b); } catch {}
-      }
-      log(`✗ ${detail}`);
-      setError('AI không thể tạo lịch trình. Xem log bên dưới.');
-      setCreating(false);
-      return;
-    }
-
-    const totalSlots = (plan.days as { slots: unknown[] }[]).reduce((n, d) => n + d.slots.length, 0);
-    log(`✓ AI đã lên ${plan.days.length} ngày với ${totalSlots} địa điểm`);
-
-    // 3. Insert trip_items from AI response
-    log('Đang lưu lịch trình...');
-    const slotMap: Record<string, 'morning' | 'afternoon' | 'evening'> = {
-      'sáng': 'morning', 'chiều': 'afternoon', 'tối': 'evening',
-    };
-    const items = (plan.days as { day: number; slots: { location_id: string; time_slot: string; hint: string | null; reason: string | null }[] }[])
-      .flatMap((d) =>
-        d.slots.map((s, i) => ({
-          trip_id:     trip.id,
-          location_id: s.location_id,
-          day_number:  d.day,
-          time_slot:   slotMap[s.time_slot] ?? 'morning',
-          note:        s.hint ?? null,
-          ai_reason:   s.reason ?? null,
-          sort_order:  i,
-        }))
-      );
-
-    if (items.length > 0) {
-      const { error: itemsErr } = await supabase.from('trip_items').insert(items);
-      if (itemsErr) {
-        log(`✗ Lỗi lưu địa điểm: ${itemsErr.message}`);
-        setError('Lưu lịch trình thất bại. Xem log bên dưới.');
-        setCreating(false);
+      if (fnErr || !plan?.days) {
+        let detail = fnErr?.message ?? plan?.error ?? JSON.stringify(plan);
+        if (fnErr?.context) {
+          try { const b = await (fnErr.context as Response).json(); detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b); } catch {}
+        }
+        log(`✗ ${detail}`);
+        setError('AI không thể tạo lịch trình. Xem log bên dưới.');
         return;
       }
-      log(`✓ Đã lưu ${items.length} địa điểm vào lịch trình`);
-    } else {
-      log('⚠ AI không gợi ý được địa điểm nào (kiểm tra seed data)');
-    }
 
-    log('Hoàn thành! Đang mở trip...');
-    setTrips([trip, ...trips]);
-    setCreating(false);
-    closeModal();
-    router.push(`/trip/${trip.id}`);
+      const totalSlots = (plan.days as { slots: unknown[] }[]).reduce((n, d) => n + d.slots.length, 0);
+      log(`✓ AI đã lên ${plan.days.length} ngày với ${totalSlots} địa điểm`);
+
+      // 3. Insert trip_items
+      log('Đang lưu lịch trình...');
+      const slotMap: Record<string, 'morning' | 'afternoon' | 'evening'> = {
+        'sáng': 'morning', 'chiều': 'afternoon', 'tối': 'evening',
+      };
+      const items = (plan.days as { day: number; slots: { location_id: string; time_slot: string; hint: string | null; reason: string | null }[] }[])
+        .flatMap((d) =>
+          d.slots.map((s, i) => ({
+            trip_id:     trip.id,
+            location_id: s.location_id,
+            day_number:  d.day,
+            time_slot:   slotMap[s.time_slot] ?? 'morning',
+            note:        s.hint ?? null,
+            ai_reason:   s.reason ?? null,
+            sort_order:  i,
+          }))
+        );
+
+      if (items.length > 0) {
+        const { error: itemsErr } = await supabase.from('trip_items').insert(items);
+        if (itemsErr) { log(`✗ Lỗi lưu địa điểm: ${itemsErr.message}`); setError('Lưu lịch trình thất bại.'); return; }
+        log(`✓ Đã lưu ${items.length} địa điểm vào lịch trình`);
+      } else {
+        log('⚠ AI không gợi ý được địa điểm nào');
+      }
+
+      log('Hoàn thành! Đang mở trip...');
+      setTrips((prev) => [trip, ...prev]);
+      success = true;
+    } catch (err: any) {
+      const msg = err?.message ?? 'Lỗi không xác định';
+      log(`✗ ${msg}`);
+      setError('Lỗi kết nối mạng. Kiểm tra internet và thử lại.');
+    } finally {
+      setCreating(false);
+    }
+    if (success) { closeModal(); router.push(`/trip/${tripId}`); }
   }
 
   if (loading) {
