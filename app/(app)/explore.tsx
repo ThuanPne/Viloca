@@ -247,20 +247,25 @@ export default function ExploreScreen() {
 
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, post_likes(user_id)')
+      .select('*, post_likes(user_id), post_comments(count)')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
-    const posts = (postsData ?? []) as Post[];
+    const posts = (postsData ?? []) as any[];
 
     if (posts.length > 0) {
+      // Dùng count thực từ post_comments thay vì cột comments_count (không có trigger cập nhật)
+      posts.forEach((p) => {
+        p.comments_count = p.post_comments?.[0]?.count ?? p.comments_count ?? 0;
+      });
+
       const userIds = [...new Set(posts.map((p) => p.user_id))];
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
         .in('id', userIds);
       const profileMap = Object.fromEntries((profilesData ?? []).map((pr: any) => [pr.id, pr]));
-      posts.forEach((p) => { (p as any).profiles = profileMap[p.user_id] ?? null; });
+      posts.forEach((p) => { p.profiles = profileMap[p.user_id] ?? null; });
     }
 
     if (append) setRealPosts((prev) => [...prev, ...posts]); else setRealPosts(posts);

@@ -81,13 +81,24 @@ export default function PostDetailScreen() {
       .insert({ post_id: post.id, user_id: user.id, content: newComment.trim() })
       .select('*')
       .single();
-    setSending(false);
     if (data) {
-      const commentWithProfile = { ...data, profiles: { full_name: user.user_metadata?.full_name ?? null, avatar_url: user.user_metadata?.avatar_url ?? null } };
+      // Cập nhật comments_count trong DB
+      await supabase
+        .from('posts')
+        .update({ comments_count: post.comments_count + 1 })
+        .eq('id', post.id);
+      const commentWithProfile = {
+        ...data,
+        profiles: {
+          full_name: user.user_metadata?.full_name ?? null,
+          avatar_url: user.user_metadata?.avatar_url ?? null,
+        },
+      };
       setComments((prev) => [...prev, commentWithProfile as PostComment]);
       setPost((p) => p ? { ...p, comments_count: p.comments_count + 1 } : p);
       setNewComment('');
     }
+    setSending(false);
   }
 
   if (loading) {
