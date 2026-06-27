@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   Image, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import supabase from '@/src/lib/supabase';
@@ -17,6 +17,7 @@ type ImageAsset = { uri: string; mimeType: string; ext: string; base64: string }
 
 export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
+  const { trip_id } = useLocalSearchParams<{ trip_id?: string }>();
   const [content, setContent]     = useState('');
   const [images, setImages]       = useState<ImageAsset[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -99,6 +100,7 @@ export default function CreatePostScreen() {
         user_id: user.id,
         content: content.trim() || null,
         images: uploadedUrls,
+        trip_id: trip_id ?? null,
       });
 
       if (error) {
@@ -134,6 +136,12 @@ export default function CreatePostScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {trip_id && (
+          <View style={styles.tripBanner}>
+            <Ionicons name="map-outline" size={16} color={colors.nomad.primary} />
+            <Text style={styles.tripBannerText}>Bài viết sẽ được gắn với chuyến đi của bạn</Text>
+          </View>
+        )}
         <TextInput
           style={styles.input}
           multiline
@@ -188,4 +196,6 @@ const styles = StyleSheet.create({
   removeBtn:    { position: 'absolute', top: 4, right: 4 },
   addImageBtn:  { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.nomad.primary, borderRadius: radius.lg, borderStyle: 'dashed', alignSelf: 'flex-start' },
   addImageText: { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
+  tripBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e8f0d8', borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
+  tripBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '500', flex: 1 },
 });

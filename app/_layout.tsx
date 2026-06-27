@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 
@@ -31,18 +32,18 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!isReady) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-      </View>
-    );
-  }
-
   return (
-    <>
-      <StatusBar style="dark" translucent />
-      <Stack screenOptions={{ headerShown: false }} />
-    </>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {!isReady ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      ) : (
+        <>
+          <StatusBar style="dark" translucent />
+          <Stack screenOptions={{ headerShown: false }} />
+        </>
+      )}
+    </GestureHandlerRootView>
   );
 }
