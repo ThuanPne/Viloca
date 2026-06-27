@@ -60,13 +60,6 @@ const BUDGETS: { label: string; sublabel: string; value: number }[] = [
   { label: '1.5M+/ngày',      sublabel: 'Cao cấp',       value: 2000000 },
 ];
 
-const PICKER_CONFIG: Record<string, { title: string; options: { label: string; value: string }[] }> = {
-  travelingWith: { title: 'Đi cùng ai?',              options: TRAVELING_WITH },
-  accommodation: { title: 'Loại hình lưu trú',        options: ACCOMMODATIONS.map((a) => ({ label: a, value: a })) },
-  transport:     { title: 'Phương tiện di chuyển',    options: TRANSPORTS.map((t) => ({ label: t, value: t })) },
-  activityLevel: { title: 'Mức độ hoạt động',         options: ACTIVITY_LEVELS.map((l) => ({ label: l, value: l })) },
-  budget:        { title: 'Ngân sách / người / ngày', options: BUDGETS.map((b) => ({ label: `${b.sublabel} — ${b.label}`, value: String(b.value) })) },
-};
 
 type Step = 1 | 2 | '3a' | '3b';
 
@@ -105,8 +98,8 @@ export default function WorkspaceScreen() {
   const [transport, setTransport] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
 
-  // Field picker
-  const [pickerField, setPickerField] = useState<string | null>(null);
+  // Inline dropdown
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => { fetchTrips(); }, [user]);
 
@@ -152,39 +145,16 @@ export default function WorkspaceScreen() {
     setError('');
     setAiLogs([]);
     setCreating(false);
-    setPickerField(null);
+    setOpenDropdown(null);
   }
 
-  function handlePickerSelect(value: string) {
-    if (pickerField === 'travelingWith') setTravelingWith(value);
-    else if (pickerField === 'accommodation') setAccommodation(value);
-    else if (pickerField === 'transport') setTransport(value);
-    else if (pickerField === 'activityLevel') setActivityLevel(value);
-    else if (pickerField === 'budget') setBudget(parseInt(value, 10));
-    setPickerField(null);
-  }
-
-  function getPickerValue(): string {
-    if (pickerField === 'travelingWith') return travelingWith;
-    if (pickerField === 'accommodation') return accommodation;
-    if (pickerField === 'transport') return transport;
-    if (pickerField === 'activityLevel') return activityLevel;
-    if (pickerField === 'budget') return budget ? String(budget) : '';
-    return '';
+  function toggleDropdown(field: string) {
+    setOpenDropdown((prev) => (prev === field ? null : field));
   }
 
   function formatVND(amount: number): string {
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}M đ`;
     return `${(amount / 1_000).toFixed(0)}k đ`;
-  }
-
-  function labelForField(field: string): string {
-    if (field === 'travelingWith') return TRAVELING_WITH.find((x) => x.value === travelingWith)?.label ?? '';
-    if (field === 'accommodation') return accommodation;
-    if (field === 'transport') return transport;
-    if (field === 'activityLevel') return activityLevel;
-    if (field === 'budget') return BUDGETS.find((b) => b.value === budget)?.label ?? '';
-    return '';
   }
 
   function confirmDeleteTrip(trip: Trip) {
@@ -624,30 +594,64 @@ export default function WorkspaceScreen() {
               {/* ── STEP 3a — AI params ── */}
               {step === '3a' && (
                 <View style={[styles.stepContent, { paddingBottom: spacing.xl }]}>
+
+                  {/* Đi cùng ai */}
                   <Text style={styles.inputLabel}>Đi cùng ai?</Text>
                   <TouchableOpacity
-                    style={[styles.input, styles.selectBtn]}
-                    onPress={() => setPickerField('travelingWith')}
+                    style={[styles.input, styles.selectBtn, openDropdown === 'travelingWith' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('travelingWith')}
                   >
                     <Text style={travelingWith ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                      {labelForField('travelingWith') || 'Chọn hình thức đi...'}
+                      {TRAVELING_WITH.find((x) => x.value === travelingWith)?.label || 'Chọn hình thức đi...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                    <Ionicons name={openDropdown === 'travelingWith' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {openDropdown === 'travelingWith' && (
+                    <View style={styles.dropdownList}>
+                      {TRAVELING_WITH.map((opt, i) => {
+                        const active = travelingWith === opt.value;
+                        return (
+                          <TouchableOpacity
+                            key={opt.value}
+                            style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
+                            onPress={() => { setTravelingWith(active ? '' : opt.value); setOpenDropdown(null); }}
+                          >
+                            <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{opt.label}</Text>
+                            {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
 
+                  {/* Phong cách chuyến đi */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Phong cách chuyến đi</Text>
-                  <View style={styles.chipRow}>
-                    {VIBES.map((v) => (
-                      <TouchableOpacity
-                        key={v}
-                        style={[styles.chip, vibes.includes(v) && styles.chipActive]}
-                        onPress={() => toggleVibe(v)}
-                      >
-                        <Text style={[styles.chipText, vibes.includes(v) && styles.chipTextActive]}>{v}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.input, styles.selectBtn, openDropdown === 'vibes' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('vibes')}
+                  >
+                    <Text style={vibes.length ? styles.selectBtnText : styles.selectBtnPlaceholder} numberOfLines={1}>
+                      {vibes.length ? vibes.join(', ') : 'Chọn phong cách...'}
+                    </Text>
+                    <Ionicons name={openDropdown === 'vibes' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  {openDropdown === 'vibes' && (
+                    <View style={[styles.dropdownList, { padding: spacing.sm }]}>
+                      <View style={styles.chipRow}>
+                        {VIBES.map((v) => (
+                          <TouchableOpacity
+                            key={v}
+                            style={[styles.chip, vibes.includes(v) && styles.chipActive]}
+                            onPress={() => toggleVibe(v)}
+                          >
+                            <Text style={[styles.chipText, vibes.includes(v) && styles.chipTextActive]}>{v}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
 
+                  {/* Số người */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số người</Text>
                   <View style={styles.stepper}>
                     <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.max(1, groupSize - 1))}>
@@ -666,6 +670,7 @@ export default function WorkspaceScreen() {
                     <Text style={styles.checkLabel}>Có trẻ em hoặc người lớn tuổi</Text>
                   </TouchableOpacity>
 
+                  {/* Số ngày */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số ngày</Text>
                   <View style={styles.stepper}>
                     <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.max(1, days - 1))}>
@@ -677,58 +682,132 @@ export default function WorkspaceScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Ngân sách tổng chuyến đi</Text>
+                  {/* Ngân sách */}
+                  <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Ngân sách / người / ngày</Text>
                   <TouchableOpacity
-                    style={[styles.input, styles.selectBtn]}
-                    onPress={() => setPickerField('budget')}
+                    style={[styles.input, styles.selectBtn, openDropdown === 'budget' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('budget')}
                   >
                     <Text style={budget ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                      {labelForField('budget') || 'Chọn mức ngân sách...'}
+                      {BUDGETS.find((b) => b.value === budget)?.label || 'Chọn mức ngân sách...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                    <Ionicons name={openDropdown === 'budget' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
                   </TouchableOpacity>
-                  {budget !== null && (
+                  {openDropdown === 'budget' && (
+                    <View style={styles.dropdownList}>
+                      {BUDGETS.map((b, i) => {
+                        const active = budget === b.value;
+                        return (
+                          <TouchableOpacity
+                            key={b.value}
+                            style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
+                            onPress={() => { setBudget(b.value); setOpenDropdown(null); }}
+                          >
+                            <View>
+                              <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{b.sublabel}</Text>
+                              <Text style={styles.dropdownItemSub}>{b.label}</Text>
+                            </View>
+                            {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {budget !== null && openDropdown !== 'budget' && (
                     <View style={styles.budgetTotalRow}>
-                      <Ionicons name="wallet-outline" size={14} color={colors.nomad.primary} />
+                      <Ionicons name="wallet-outline" size={14} color={N.primary} />
                       <Text style={styles.budgetTotalText}>
-                        Dự kiến tổng: ~{formatVND(budget * groupSize * days)}
-                        {'  '}({groupSize} người × {days} ngày)
+                        Dự kiến tổng: ~{formatVND(budget * groupSize * days)}{'  '}({groupSize} người × {days} ngày)
                       </Text>
                     </View>
                   )}
 
+                  {/* Loại hình lưu trú */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Loại hình lưu trú</Text>
                   <TouchableOpacity
-                    style={[styles.input, styles.selectBtn]}
-                    onPress={() => setPickerField('accommodation')}
+                    style={[styles.input, styles.selectBtn, openDropdown === 'accommodation' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('accommodation')}
                   >
                     <Text style={accommodation ? styles.selectBtnText : styles.selectBtnPlaceholder}>
                       {accommodation || 'Chọn loại lưu trú...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                    <Ionicons name={openDropdown === 'accommodation' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {openDropdown === 'accommodation' && (
+                    <View style={styles.dropdownList}>
+                      {ACCOMMODATIONS.map((a, i) => {
+                        const active = accommodation === a;
+                        return (
+                          <TouchableOpacity
+                            key={a}
+                            style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
+                            onPress={() => { setAccommodation(active ? '' : a); setOpenDropdown(null); }}
+                          >
+                            <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{a}</Text>
+                            {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
 
+                  {/* Phương tiện di chuyển */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Phương tiện di chuyển</Text>
                   <TouchableOpacity
-                    style={[styles.input, styles.selectBtn]}
-                    onPress={() => setPickerField('transport')}
+                    style={[styles.input, styles.selectBtn, openDropdown === 'transport' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('transport')}
                   >
                     <Text style={transport ? styles.selectBtnText : styles.selectBtnPlaceholder}>
                       {transport || 'Chọn phương tiện...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                    <Ionicons name={openDropdown === 'transport' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {openDropdown === 'transport' && (
+                    <View style={styles.dropdownList}>
+                      {TRANSPORTS.map((t, i) => {
+                        const active = transport === t;
+                        return (
+                          <TouchableOpacity
+                            key={t}
+                            style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
+                            onPress={() => { setTransport(active ? '' : t); setOpenDropdown(null); }}
+                          >
+                            <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{t}</Text>
+                            {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
 
+                  {/* Mức độ hoạt động */}
                   <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Mức độ hoạt động</Text>
                   <TouchableOpacity
-                    style={[styles.input, styles.selectBtn]}
-                    onPress={() => setPickerField('activityLevel')}
+                    style={[styles.input, styles.selectBtn, openDropdown === 'activityLevel' && styles.selectBtnOpen]}
+                    onPress={() => toggleDropdown('activityLevel')}
                   >
                     <Text style={activityLevel ? styles.selectBtnText : styles.selectBtnPlaceholder}>
                       {activityLevel || 'Chọn mức độ...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                    <Ionicons name={openDropdown === 'activityLevel' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {openDropdown === 'activityLevel' && (
+                    <View style={styles.dropdownList}>
+                      {ACTIVITY_LEVELS.map((l, i) => {
+                        const active = activityLevel === l;
+                        return (
+                          <TouchableOpacity
+                            key={l}
+                            style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
+                            onPress={() => { setActivityLevel(active ? '' : l); setOpenDropdown(null); }}
+                          >
+                            <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{l}</Text>
+                            {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -770,36 +849,6 @@ export default function WorkspaceScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ── Field Picker Modal ── */}
-      {pickerField && PICKER_CONFIG[pickerField] && (
-        <Modal visible animationType="slide" transparent onRequestClose={() => setPickerField(null)}>
-          <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setPickerField(null)}>
-            <View style={styles.pickerSheet}>
-              <View style={styles.modalHandle} />
-              <View style={styles.pickerHeader}>
-                <Text style={styles.modalTitle}>{PICKER_CONFIG[pickerField].title}</Text>
-                <TouchableOpacity onPress={() => setPickerField(null)}>
-                  <Ionicons name="close" size={24} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-              {PICKER_CONFIG[pickerField].options.map((opt, i) => {
-                const current = getPickerValue();
-                const active = current === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.pickerItem, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.nomad.outlineVariant }]}
-                    onPress={() => handlePickerSelect(opt.value)}
-                  >
-                    <Text style={[styles.pickerItemText, active && styles.pickerItemTextActive]}>{opt.label}</Text>
-                    {active && <Ionicons name="checkmark" size={18} color={colors.nomad.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
     </ScreenWrapper>
   );
 }
@@ -863,13 +912,14 @@ const styles = StyleSheet.create({
   aiLogItem:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
   aiLogItemText:      { fontSize: 14, color: N.onSurface, flex: 1, lineHeight: 20 },
 
-  // Field Picker Modal
-  pickerOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  pickerSheet:        { backgroundColor: N.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  pickerHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: spacing.md },
-  pickerItem:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
-  pickerItemText:     { fontSize: 15, color: N.onSurface },
-  pickerItemTextActive: { color: N.primary, fontWeight: '700' },
+  // Inline dropdown
+  selectBtnOpen:          { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
+  dropdownList:           { borderWidth: 1, borderColor: N.outlineVariant, borderTopWidth: 0, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, backgroundColor: N.surfaceContainerLow, marginBottom: 2 },
+  dropdownItem:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13 },
+  dropdownItemBorder:     { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: N.outlineVariant },
+  dropdownItemText:       { fontSize: 14, color: N.onSurface },
+  dropdownItemTextActive: { color: N.primary, fontWeight: '700' },
+  dropdownItemSub:        { fontSize: 12, color: N.onSurfaceVariant, marginTop: 2 },
 
   // Step indicator
   stepRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
