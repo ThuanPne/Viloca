@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Coding Workflow
+
+**Mỗi coding request phải đi theo pipeline sau:**
+
+```
+/analyze  →  Code  →  /qa-review
+```
+
+1. **`/analyze` trước khi code** — Phân tích yêu cầu, hỏi làm rõ nếu cần, tạo spec file tại `.claude/specs/`. Bỏ qua bước hỏi nếu request đơn giản (sửa nhỏ, typo, style), nhưng vẫn tạo spec.
+2. **Code theo spec** — Implement đúng theo acceptance criteria trong spec file.
+3. **`/qa-review` sau khi code xong** — Verify code khớp với spec. Báo PASS/WARN/FAIL.
+
+**Không code trực tiếp** khi request liên quan đến tính năng mới, màn hình mới, hoặc thay đổi behavior — luôn chạy `/analyze` trước.
+
 ## Commands
 
 ```bash
