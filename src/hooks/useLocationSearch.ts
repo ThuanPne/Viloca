@@ -27,7 +27,8 @@ export function useLocationSearch() {
         city_code:        cityCode ?? null,
         category_keyword: null,
       });
-      setResults((data as Location[]) ?? []);
+      const rows = (data as Location[]) ?? [];
+      setResults(cityCode ? rows.filter(l => l.city === cityCode) : rows);
       setLoading(false);
     }, DEBOUNCE_MS);
 

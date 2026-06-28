@@ -184,18 +184,9 @@ export default function SearchScreen() {
           keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => <LocationResultCard location={item} onPick={isPickMode ? handlePick : undefined} />}
-          ListFooterComponent={
-            hasMore ? (
-              <TouchableOpacity
-                style={styles.loadMoreBtn}
-                onPress={() => setDisplayCount((c) => c + LOAD_MORE)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.loadMoreText}>Xem thêm</Text>
-                <Ionicons name="chevron-down" size={14} color={colors.nomad.primary} />
-              </TouchableOpacity>
-            ) : null
-          }
+          onEndReached={() => hasMore && setDisplayCount((c) => c + LOAD_MORE)}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={hasMore ? <ActivityIndicator color={colors.nomad.primary} style={styles.footerLoader} /> : null}
         />
       )}
     </View>
@@ -267,10 +258,5 @@ const styles = StyleSheet.create({
   pickBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '600' },
   pickBtn:        { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
 
-  // Load more
-  loadMoreBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 14, marginTop: 4,
-  },
-  loadMoreText: { fontSize: 14, fontWeight: '600', color: colors.nomad.primary },
+  footerLoader: { paddingVertical: 16 },
 });

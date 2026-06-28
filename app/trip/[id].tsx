@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  View, Text, StyleSheet, TouchableOpacity,
   ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -84,111 +84,247 @@ function formatDate(iso: string) {
 
 // ─── Sortable Day List ────────────────────────────────────────────────────────
 
-const ITEM_H = 90; // approximate height of each timeline card
+const ITEM_H = 96;
+const LEFT_W = 88; // dragHandle(28) + timeCol(44) + dotCol(16)
 
 type SortableProps = {
   items: TripItem[];
-  trip: Trip;
-  dayNum: number;
   editMode?: boolean;
   checkedIds?: Set<string>;
   onToggleCheck?: (id: string) => void;
   onReorder: (newItems: TripItem[]) => void;
   onItemPress: (item: TripItem) => void;
-  onItemDetail: (item: TripItem) => void;
+  onDragStateChange?: (dragging: boolean) => void;
 };
 
-function SortableDayItems({ items, trip, dayNum, editMode, checkedIds, onToggleCheck, onReorder, onItemPress, onItemDetail }: SortableProps) {
-  const [display, setDisplay]   = useState<TripItem[]>(items);
-  const [activeId, setActiveId] = useState<string | null>(null);
+// ── Nội dung bên trong card (ảnh + text) ─────────────────────────────────────
 
-  // refs — stable across re-renders, safe to read inside gesture callbacks
-  const displayRef   = useRef<TripItem[]>(items);
-  const onReorderRef = useRef(onReorder);
-  const pendingIdx   = useRef(-1);
-  const startIdx     = useRef(-1);
-  const currentIdx   = useRef(-1);
-  const activeIdRef  = useRef<string | null>(null);
-
-  // keep onReorder ref in sync without recreating the gesture
-  onReorderRef.current = onReorder;
-
-  useEffect(() => {
-    displayRef.current = items;
-    setDisplay(items);
-    setActiveId(null);
-    activeIdRef.current = null;
-  }, [items]);
-
-  // gesture created once — never recreated on re-render
-  const panGesture = useMemo(() => Gesture.Pan()
-    .runOnJS(true)
-    .activateAfterLongPress(220)
-    .onStart(() => {
-      const idx = pendingIdx.current;
-      const id  = displayRef.current[idx]?.id ?? null;
-      startIdx.current    = idx;
-      currentIdx.current  = idx;
-      activeIdRef.current = id;
-      setActiveId(id);
-    })
-    .onUpdate((e) => {
-      if (startIdx.current < 0 || !activeIdRef.current) return;
-      const target = Math.max(0, Math.min(
-        displayRef.current.length - 1,
-        startIdx.current + Math.round(e.translationY / ITEM_H),
-      ));
-      if (target === currentIdx.current) return;
-      const next    = [...displayRef.current];
-      const fromIdx = next.findIndex(i => i.id === activeIdRef.current);
-      if (fromIdx < 0) return;
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(target, 0, moved);
-      displayRef.current = next;
-      setDisplay([...next]);
-      currentIdx.current = target;
-    })
-    .onEnd(() => {
-      if (activeIdRef.current) onReorderRef.current([...displayRef.current]);
-      setActiveId(null);
-      activeIdRef.current = null;
-      startIdx.current    = -1;
-    })
-    .onFinalize(() => {
-      setActiveId(null);
-      activeIdRef.current = null;
-      startIdx.current    = -1;
-    }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  []);
+function CardInner({ item }: { item: TripItem }) {
+  const locData      = item.locations ?? null;
+  const displayTitle = locData?.name ?? item.experience_title ?? '—';
+  const displayLoc   = locData?.district ?? item.experience_location;
+  const hintText     = item.note ?? locData?.hint ?? null;
+  const displayCat   = locData?.category ?? item.experience_category;
+  const photoUrl     = locData?.cover_image
+    ?? (locData?.photos ? locData.photos.split(',')[0].trim() : null)
+    ?? item.experience_image ?? null;
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <View>
-        {display.map((item, idx) => {
-          const isActive      = activeId === item.id;
-          const locData       = item.locations ?? null;
-          const displayTitle  = locData?.name ?? item.experience_title ?? '—';
-          const displayLoc    = locData?.district ?? item.experience_location;
-          const hintText      = item.note ?? locData?.hint ?? null;
-          const displayNote   = item.note ?? null;
-          const displayCat    = locData?.category ?? item.experience_category;
-          const slotIdx       = display.filter(i => i.time_slot === item.time_slot).findIndex(i => i.id === item.id);
-          const timeLabel     = item.visit_time ? item.visit_time.slice(0, 5) : suggestTime(item.time_slot, slotIdx);
-          const isLast        = idx === display.length - 1;
+    <View style={styles.cardInner}>
+      <ImageBackground
+        source={photoUrl ? { uri: photoUrl } : undefined}
+        style={styles.cardThumb}
+        imageStyle={styles.cardThumbImg}
+        resizeMode="cover"
+      >
+        {!photoUrl && (
+          <LinearGradient colors={[colors.nomad.primaryContainer, colors.nomad.primary]} style={StyleSheet.absoluteFillObject} />
+        )}
+        {photoUrl && (
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)']} locations={[0.4, 1]} style={StyleSheet.absoluteFillObject} />
+        )}
+      </ImageBackground>
+      <View style={styles.cardBody}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.timelineTitle} numberOfLines={2}>{displayTitle}</Text>
+          {!!item.ai_reason && (
+            <View style={styles.aiItemBadge}>
+              <Ionicons name="sparkles" size={9} color={colors.nomad.primary} />
+              <Text style={styles.aiItemBadgeText}>AI</Text>
+            </View>
+          )}
+        </View>
+        {displayLoc && (
+          <View style={styles.cardLocRow}>
+            <Ionicons name="location-outline" size={11} color={colors.textMuted} />
+            <Text style={styles.timelineCardLoc} numberOfLines={1}>{displayLoc}</Text>
+          </View>
+        )}
+        {hintText && (
+          <Text style={[styles.timelineCardDesc, { fontStyle: 'italic' }]} numberOfLines={1}>{hintText}</Text>
+        )}
+        {displayCat && (
+          <View style={[styles.tagChip, { alignSelf: 'flex-start', marginTop: 4 }]}>
+            <Text style={styles.tagChipText}>{CATEGORY_LABEL[displayCat] ?? displayCat}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
 
-          const photoUrl = locData?.cover_image
-            ?? (locData?.photos ? locData.photos.split(',')[0].trim() : null)
-            ?? item.experience_image
-            ?? null;
+// ── Card slot riêng với GestureDetector ──────────────────────────────────────
 
+type CardSlotProps = {
+  item: TripItem;
+  idx: number;
+  isActive: boolean;
+  offset: Animated.Value;
+  editMode?: boolean;
+  checkedIds?: Set<string>;
+  onPress: () => void;
+  onDragStart: () => void;
+  onDragMove: (translationY: number) => void;
+  onDragEnd: () => void;
+};
+
+function CardSlot({ item, idx, isActive, offset, editMode, checkedIds, onPress, onDragStart, onDragMove, onDragEnd }: CardSlotProps) {
+  const startRef = useRef(onDragStart);
+  const moveRef  = useRef(onDragMove);
+  const endRef   = useRef(onDragEnd);
+  startRef.current = onDragStart;
+  moveRef.current  = onDragMove;
+  endRef.current   = onDragEnd;
+
+  const gesture = useMemo(() => Gesture.Pan()
+    .runOnJS(true)
+    .activateAfterLongPress(300)
+    .onStart(() => startRef.current())
+    .onUpdate((e) => moveRef.current(e.translationY))
+    .onEnd(() => endRef.current())
+    .onFinalize(() => endRef.current()),
+  []);
+
+  const isChecked = !!checkedIds?.has(item.id);
+
+  return (
+    <Animated.View style={[
+      styles.cardSlot,
+      { top: idx * ITEM_H },
+      isActive && { opacity: 0 },
+      { transform: [{ translateY: offset }] },
+    ]}>
+      {editMode ? (
+        <TouchableOpacity
+          style={[styles.timelineCard, isChecked && styles.timelineCardActive]}
+          activeOpacity={0.9}
+          onPress={onPress}
+        >
+          <CardInner item={item} />
+        </TouchableOpacity>
+      ) : (
+        <GestureDetector gesture={gesture}>
+          <TouchableOpacity
+            style={[styles.timelineCard, isActive && styles.timelineCardActive]}
+            activeOpacity={0.9}
+            onPress={onPress}
+          >
+            <CardInner item={item} />
+          </TouchableOpacity>
+        </GestureDetector>
+      )}
+    </Animated.View>
+  );
+}
+
+// ── SortableDayItems ──────────────────────────────────────────────────────────
+
+function SortableDayItems({ items, editMode, checkedIds, onToggleCheck, onReorder, onItemPress, onDragStateChange }: SortableProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const activeIdxRef = useRef(-1);
+  const targetIdxRef = useRef(-1);
+  const itemsRef     = useRef(items);
+  const onReorderRef = useRef(onReorder);
+  const dscRef       = useRef(onDragStateChange);
+
+  onReorderRef.current = onReorder;
+  dscRef.current       = onDragStateChange;
+  itemsRef.current     = items;
+
+  const fingerY = useRef(new Animated.Value(0)).current;
+  const offsets = useRef<Animated.Value[]>(items.map(() => new Animated.Value(0)));
+
+  useEffect(() => {
+    setActiveId(null);
+    activeIdxRef.current = -1;
+    targetIdxRef.current = -1;
+    fingerY.setValue(0);
+    if (offsets.current.length !== items.length) {
+      offsets.current = items.map(() => new Animated.Value(0));
+    } else {
+      offsets.current.forEach(v => v.setValue(0));
+    }
+  }, [items]);
+
+  function handleDragStart(idx: number, itemId: string) {
+    if (activeIdxRef.current >= 0) return;
+    activeIdxRef.current = idx;
+    targetIdxRef.current = idx;
+    fingerY.setValue(idx * ITEM_H);
+    setActiveId(itemId);
+    dscRef.current?.(true);
+  }
+
+  function handleDragMove(translationY: number) {
+    if (activeIdxRef.current < 0) return;
+    const raw    = activeIdxRef.current * ITEM_H + translationY;
+    fingerY.setValue(raw);
+
+    const n      = itemsRef.current.length;
+    const start  = activeIdxRef.current;
+    const target = Math.max(0, Math.min(n - 1, Math.round(raw / ITEM_H)));
+
+    if (target === targetIdxRef.current) return;
+
+    offsets.current.forEach((val, i) => {
+      if (i === start) return;
+      let toValue = 0;
+      if (start < target && i > start && i <= target) toValue = -ITEM_H;
+      else if (start > target && i >= target && i < start) toValue = ITEM_H;
+      Animated.timing(val, { toValue, duration: 150, useNativeDriver: true }).start();
+    });
+
+    targetIdxRef.current = target;
+  }
+
+  function handleDragEnd() {
+    if (activeIdxRef.current < 0) return;
+    const start  = activeIdxRef.current;
+    const target = targetIdxRef.current;
+
+    activeIdxRef.current = -1;
+    setActiveId(null);
+    offsets.current.forEach(v => v.setValue(0));
+    fingerY.setValue(0);
+    targetIdxRef.current = -1;
+    dscRef.current?.(false);
+
+    if (start !== target) {
+      // Snapshot thời gian của từng vị trí TRƯỚC khi reorder
+      const posTimes = itemsRef.current.map(i => ({
+        time_slot:  i.time_slot,
+        visit_time: i.visit_time,
+      }));
+
+      const next = [...itemsRef.current];
+      const [moved] = next.splice(start, 1);
+      next.splice(target, 0, moved);
+
+      // Gán lại thời gian theo vị trí (Model 1: slot cố định, location điền vào)
+      const nextWithTimes = next.map((item, idx) => ({
+        ...item,
+        time_slot:  posTimes[idx].time_slot,
+        visit_time: posTimes[idx].visit_time,
+      }));
+
+      onReorderRef.current(nextWithTimes);
+    }
+  }
+
+  const activeItem = activeId ? (items.find(i => i.id === activeId) ?? null) : null;
+
+  return (
+    <View style={{ height: items.length * ITEM_H, position: 'relative' }}>
+
+      {/* ── Time column: theo vị trí (idx), không bao giờ animate ─────────── */}
+      <View style={styles.timeColumn}>
+        {items.map((item, idx) => {
+          const slotIdx  = items.filter(i => i.time_slot === item.time_slot).findIndex(i => i.id === item.id);
+          const timeLabel = item.visit_time ? item.visit_time.slice(0, 5) : suggestTime(item.time_slot, slotIdx);
+          const isLast   = idx === items.length - 1;
           return (
-            <View
-              key={item.id}
-              onStartShouldSetResponder={() => { pendingIdx.current = idx; return false; }}
-              style={[styles.timelineRow, isActive && styles.timelineRowActive]}
-            >
-              {/* Checkbox (edit mode) hoặc drag handle */}
+            <View key={String(idx)} style={styles.timeSlot}>
               {editMode ? (
                 <TouchableOpacity
                   style={styles.checkboxWrap}
@@ -201,86 +337,48 @@ function SortableDayItems({ items, trip, dayNum, editMode, checkedIds, onToggleC
                 </TouchableOpacity>
               ) : (
                 <View style={styles.dragHandle}>
-                  <Ionicons name="reorder-two-outline" size={20} color={isActive ? colors.nomad.primary : colors.border} />
+                  <Ionicons name="reorder-two-outline" size={20}
+                    color={activeId === item.id ? colors.nomad.primary : colors.border} />
                 </View>
               )}
-
-              {/* Giờ bên trái */}
               <View style={styles.timelineTimeCol}>
                 <Text style={styles.timelineTime}>{timeLabel}</Text>
               </View>
-
-              {/* Dot + line */}
               <View style={styles.timelineDotCol}>
                 <View style={[styles.timelineDot, idx === 0 && styles.timelineDotFirst]} />
                 {!isLast && <View style={styles.timelineLine} />}
               </View>
-
-              {/* Card */}
-              <TouchableOpacity
-                style={[styles.timelineCard, isActive && styles.timelineCardActive]}
-                activeOpacity={0.9}
-                onPress={() => onItemPress(item)}
-                onLongPress={() => onItemDetail(item)}
-                delayLongPress={500}
-              >
-                <View style={styles.cardInner}>
-                  {/* Ảnh bên trái */}
-                  <ImageBackground
-                    source={photoUrl ? { uri: photoUrl } : undefined}
-                    style={styles.cardThumb}
-                    imageStyle={styles.cardThumbImg}
-                    resizeMode="cover"
-                  >
-                    {!photoUrl && (
-                      <LinearGradient
-                        colors={[colors.nomad.primaryContainer, colors.nomad.primary]}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                    )}
-                    {photoUrl && (
-                      <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.35)']}
-                        locations={[0.4, 1]}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                    )}
-                  </ImageBackground>
-
-                  {/* Text bên phải */}
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardTitleRow}>
-                      <Text style={styles.timelineTitle} numberOfLines={2}>{displayTitle}</Text>
-                      {!!item.ai_reason && (
-                        <View style={styles.aiItemBadge}>
-                          <Ionicons name="sparkles" size={9} color={colors.nomad.primary} />
-                          <Text style={styles.aiItemBadgeText}>AI</Text>
-                        </View>
-                      )}
-                    </View>
-                    {displayLoc && (
-                      <View style={styles.cardLocRow}>
-                        <Ionicons name="location-outline" size={11} color={colors.textMuted} />
-                        <Text style={styles.timelineCardLoc} numberOfLines={1}>{displayLoc}</Text>
-                      </View>
-                    )}
-                    {hintText && (
-                      <Text style={[styles.timelineCardDesc, { fontStyle: 'italic' }]} numberOfLines={1}>{hintText}</Text>
-                    )}
-                    {displayCat && (
-                      <View style={[styles.tagChip, { alignSelf: 'flex-start', marginTop: 6 }]}>
-                        <Text style={styles.tagChipText}>{CATEGORY_LABEL[displayCat] ?? displayCat}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-              </TouchableOpacity>
             </View>
           );
         })}
       </View>
-    </GestureDetector>
+
+      {/* ── Card slots: animate tự do, không ảnh hưởng time column ──────────── */}
+      {items.map((item, idx) => (
+        <CardSlot
+          key={item.id}
+          item={item}
+          idx={idx}
+          isActive={activeId === item.id}
+          offset={offsets.current[idx] ?? new Animated.Value(0)}
+          editMode={editMode}
+          checkedIds={checkedIds}
+          onPress={() => onItemPress(item)}
+          onDragStart={() => handleDragStart(idx, item.id)}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+        />
+      ))}
+
+      {/* ── Floating overlay: bản sao floating theo ngón tay ─────────────── */}
+      {activeItem && (
+        <Animated.View style={[styles.floatingCard, { transform: [{ translateY: fingerY }] }]}>
+          <View style={[styles.timelineCard, styles.timelineCardActive, styles.floatingCardElevated]}>
+            <CardInner item={activeItem} />
+          </View>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -333,7 +431,7 @@ export default function TripDetailScreen() {
   const coverHeight  = scrollY.interpolate({ inputRange: [0, COVER_MAX - COVER_MIN], outputRange: [COVER_MAX, COVER_MIN], extrapolate: 'clamp' });
   const coverOpacity = scrollY.interpolate({ inputRange: [0, COVER_MAX - COVER_MIN], outputRange: [1, 0.45], extrapolate: 'clamp' });
 
-  // Dragging state per day
+  const [isDragging, setIsDragging] = useState(false);
 
   // Detail modal
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
@@ -486,17 +584,18 @@ export default function TripDetailScreen() {
   // ── Reorder (drag-and-drop) ───────────────────────────────────────────────────
 
   async function handleDragEnd(dayNum: number, newOrder: TripItem[]) {
-    // Optimistic: update sort_order sequentially
     const updated = newOrder.map((item, idx) => ({ ...item, sort_order: idx }));
     setItems(prev => {
       const otherDays = prev.filter(i => i.day_number !== dayNum);
       return [...otherDays, ...updated].sort((a, b) => a.day_number - b.day_number || a.sort_order - b.sort_order);
     });
-    // Persist
     await Promise.all(
-      updated.map(item => supabase.from('trip_items').update({ sort_order: item.sort_order }).eq('id', item.id))
+      updated.map(item => supabase.from('trip_items').update({
+        sort_order: item.sort_order,
+        time_slot:  item.time_slot,
+        visit_time: item.visit_time,
+      }).eq('id', item.id))
     );
-
   }
 
   // ── Bulk actions ─────────────────────────────────────────────────────────────
@@ -652,6 +751,7 @@ export default function TripDetailScreen() {
       <Animated.ScrollView
         style={{ flex: 1 }}
         scrollEventThrottle={16}
+        scrollEnabled={!isDragging}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
       >
         {/* Cover */}
@@ -856,8 +956,6 @@ export default function TripDetailScreen() {
                   ) : (
                     <SortableDayItems
                       items={(itemsByDay[selectedDay] ?? []).sort((a, b) => a.sort_order - b.sort_order)}
-                      trip={trip}
-                      dayNum={selectedDay}
                       editMode={editMode}
                       checkedIds={checkedIds}
                       onToggleCheck={(id) => setCheckedIds(prev => {
@@ -875,7 +973,7 @@ export default function TripDetailScreen() {
                           else setSelectedItem(item);
                         }
                       }}
-                      onItemDetail={(item) => { if (!editMode) setSelectedItem(item); }}
+                      onDragStateChange={setIsDragging}
                     />
                   )}
 
@@ -1313,9 +1411,13 @@ const styles = StyleSheet.create({
   dayEmptyAddText:  { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
 
 
-  // Timeline row
-  timelineRow:       { flexDirection: 'row', alignItems: 'stretch', marginBottom: 8, paddingHorizontal: 4, paddingVertical: 2 },
-  timelineRowActive: { backgroundColor: colors.nomad.primary + '12', borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.nomad.primary + '60' },
+  // Two-column drag layout
+  timeColumn:         { position: 'absolute', left: 0, width: LEFT_W, top: 0, bottom: 0 },
+  timeSlot:           { height: ITEM_H, flexDirection: 'row', alignItems: 'stretch' },
+  cardSlot:           { position: 'absolute', left: LEFT_W, right: 4, height: ITEM_H, paddingTop: 4, paddingBottom: 4 },
+  floatingCard:       { position: 'absolute', left: LEFT_W, right: 4, height: ITEM_H, zIndex: 99, elevation: 12, paddingTop: 4, paddingBottom: 4 },
+  floatingCardElevated: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 10, elevation: 12 },
+
   dragHandle:        { width: 28, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 14 },
   checkboxWrap:      { width: 28, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 14 },
   checkbox:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgCard },
@@ -1327,15 +1429,14 @@ const styles = StyleSheet.create({
   moveDayChipText:   { fontSize: 14, fontWeight: '700', color: colors.nomad.primary },
   timelineTimeCol:   { width: 44, alignItems: 'flex-end', paddingRight: 6, paddingTop: 32 },
   timelineTime:      { fontSize: 11, fontWeight: '700', color: colors.nomad.primary },
-  timelineTime2:     { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginRight: 6, marginTop: 2 },
   timelineDotCol:    { width: 16, alignItems: 'center', paddingTop: 11 },
   timelineDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border, borderWidth: 2, borderColor: colors.nomad.primary },
   timelineDotFirst:  { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.nomad.primary, borderWidth: 0 },
   timelineLine:      { width: 2, flex: 1, backgroundColor: colors.nomad.primary + '25', marginTop: 4 },
-  timelineCard:       { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.nomad.primary + '30', marginLeft: 8, marginBottom: 0, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  timelineCard:       { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.nomad.primary + '30', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
   timelineCardActive: { borderColor: colors.nomad.primary, borderWidth: 2, backgroundColor: '#f4f8ec', shadowOpacity: 0.14, elevation: 5 },
-  cardInner:          { flexDirection: 'row', alignItems: 'stretch' },
-  cardThumb:          { width: 80, height: 86, justifyContent: 'flex-end' },
+  cardInner:          { flexDirection: 'row', alignItems: 'stretch', flex: 1 },
+  cardThumb:          { width: 80, height: 88, justifyContent: 'flex-end' },
   cardThumbImg:       { borderTopLeftRadius: radius.lg - 1, borderBottomLeftRadius: radius.lg - 1 },
   cardThumbTime:      { paddingHorizontal: 5, paddingVertical: 3 },
   cardThumbTimeText:  { fontSize: 10, fontWeight: '700', color: '#fff' },
