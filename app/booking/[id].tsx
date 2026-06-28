@@ -19,6 +19,12 @@ import {
 const N = colors.nomad;
 const COVER_MAX = 220;
 const COVER_MIN = 72;
+const HEADER_H = 48;
+
+const WARNING_BG     = '#FFFBEB';
+const WARNING_BORDER = '#FDE68A';
+const WARNING_TEXT   = '#92400E';
+const STAR_COLOR     = '#F59E0B';
 
 const STATUS_LABEL: Record<TourStatus, string> = {
   pending:   'Chờ xác nhận',
@@ -34,7 +40,7 @@ const STATUS_COLOR: Record<TourStatus, 'warning' | 'forest' | 'neutral'> = {
 };
 
 const CATEGORY_COLOR: Record<string, string> = {
-  'Điểm danh': '#64748b',
+  'Điểm danh': N.outline,
   'Di tích':   '#7c3aed',
   'Tâm linh':  '#d97706',
   'Ẩm thực':   '#dc2626',
@@ -74,7 +80,7 @@ function StarRow({ value, onChange }: { value: number; onChange: (v: number) => 
           <Ionicons
             name={i <= value ? 'star' : 'star-outline'}
             size={32}
-            color={i <= value ? '#F59E0B' : N.outlineVariant}
+            color={i <= value ? STAR_COLOR : N.outlineVariant}
           />
         </TouchableOpacity>
       ))}
@@ -160,10 +166,6 @@ export default function BookingDetailScreen() {
   }
 
   const coverUrl = `https://picsum.photos/seed/${tour.coverSeed}/800/500`;
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-
-  const HEADER_H = 48;
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -496,7 +498,7 @@ const s = StyleSheet.create({
     zIndex: 20,
   },
   headerBg: {
-    ...StyleSheet.absoluteFillObject as object,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: N.surface,
     borderBottomWidth: 1,
     borderBottomColor: N.outlineVariant,
@@ -507,7 +509,7 @@ const s = StyleSheet.create({
 
   // Cover — absolutely positioned, never changes size
   coverWrap:    { position: 'absolute', left: 0, right: 0, height: COVER_MAX, overflow: 'hidden', backgroundColor: N.surfaceContainer, zIndex: 1 },
-  coverContent: { ...StyleSheet.absoluteFillObject as object, padding: spacing.lg, justifyContent: 'space-between' },
+  coverContent: { ...StyleSheet.absoluteFillObject, padding: spacing.lg, justifyContent: 'space-between' },
   coverTopRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   coverBottomRow: { gap: 4 },
   coverTitle:   { fontSize: 20, fontWeight: '800', color: '#fff' },
@@ -546,9 +548,9 @@ const s = StyleSheet.create({
 
   // Special requests
   requestList: { gap: spacing.sm },
-  requestItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: '#FFFBEB', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#FDE68A' },
+  requestItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: WARNING_BG, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: WARNING_BORDER },
   requestEmoji: { fontSize: 16 },
-  requestText:  { fontSize: 13, color: '#92400E', flex: 1, lineHeight: 18 },
+  requestText:  { fontSize: 13, color: WARNING_TEXT, flex: 1, lineHeight: 18 },
 
   // Timeline
   timeline:    { gap: 0 },
@@ -602,7 +604,7 @@ const s = StyleSheet.create({
   primaryBtnTextDisabled:{ color: N.outline },
 
   // Complete modal
-  modalOverlay:    { ...StyleSheet.absoluteFillObject as object, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalOverlay:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalBox:        { position: 'absolute', alignSelf: 'center', top: '30%', width: '85%', backgroundColor: N.surface, borderRadius: radius.xl, padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
   modalEmoji:      { fontSize: 40 },
   modalTitle:      { fontSize: 20, fontWeight: '800', color: N.onSurface },
