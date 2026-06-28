@@ -1,112 +1,25 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, ScrollView, Pressable,
 } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/src/components/ui/Badge';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
+import {
+  MOCK_BOOKING_DETAILS, updateTourStatus,
+  type MockBookingDetail, type TourStatus,
+} from '@/src/data/mockTourData';
 
 const N = colors.nomad;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type TourStatus = 'pending' | 'confirmed' | 'active' | 'completed';
-type FilterTab  = 'upcoming' | 'active' | 'completed';
-
-interface MockTour {
-  id: string;
-  status: TourStatus;
-  title: string;
-  date: string;
-  time: string;
-  guestCount: number;
-  groupType: string;
-  language: string;
-  category: string;
-  meetingPoint: string;
-  guideEarning: number;
-  tourPrice: number;
-  platformFee: number;
-  deadlineMinutes: number | null;
-  specialNote: string | null;
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_TOURS: MockTour[] = [
-  {
-    id: '1',
-    status: 'pending',
-    title: 'Tour Ngũ Hành Sơn',
-    date: '21/07/2026',
-    time: '08:00 – 13:00',
-    guestCount: 15,
-    groupType: 'Gia đình',
-    language: 'Tiếng Anh',
-    category: 'Khám phá',
-    meetingPoint: 'Cổng chính Ngũ Hành Sơn, Đà Nẵng',
-    guideEarning: 1_200_000,
-    tourPrice: 1_800_000,
-    platformFee: 600_000,
-    deadlineMinutes: 150,
-    specialNote: 'Nhóm có 2 trẻ em dưới 10 tuổi, cần hỗ trợ thêm',
-  },
-  {
-    id: '2',
-    status: 'confirmed',
-    title: 'Tour Phố cổ Hội An — Đêm',
-    date: '18/07/2026',
-    time: '18:00 – 21:30',
-    guestCount: 8,
-    groupType: 'Bạn bè',
-    language: 'Tiếng Việt',
-    category: 'City Tour',
-    meetingPoint: 'Cầu Nhật Bản, Hội An',
-    guideEarning: 800_000,
-    tourPrice: 1_200_000,
-    platformFee: 400_000,
-    deadlineMinutes: null,
-    specialNote: null,
-  },
-  {
-    id: '3',
-    status: 'active',
-    title: 'Tour Bà Nà Hills',
-    date: '28/06/2026',
-    time: '07:30 – 17:00',
-    guestCount: 20,
-    groupType: 'Công ty',
-    language: 'Tiếng Anh',
-    category: 'Trekking',
-    meetingPoint: 'Trạm cáp treo Sun World, Đà Nẵng',
-    guideEarning: 2_500_000,
-    tourPrice: 3_500_000,
-    platformFee: 1_000_000,
-    deadlineMinutes: null,
-    specialNote: 'Đoàn 20 người, cần loa di động',
-  },
-  {
-    id: '4',
-    status: 'completed',
-    title: 'Tour Mỹ Sơn Thánh địa',
-    date: '15/06/2026',
-    time: '09:00 – 14:00',
-    guestCount: 6,
-    groupType: 'Cặp đôi',
-    language: 'Tiếng Pháp',
-    category: 'Lịch sử',
-    meetingPoint: 'Cổng Thánh địa Mỹ Sơn, Quảng Nam',
-    guideEarning: 900_000,
-    tourPrice: 1_400_000,
-    platformFee: 500_000,
-    deadlineMinutes: null,
-    specialNote: null,
-  },
-];
+type FilterTab = 'upcoming' | 'active' | 'completed';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -135,7 +48,7 @@ const STATUS_COLOR: Record<TourStatus, 'warning' | 'forest' | 'neutral'> = {
   completed: 'neutral',
 };
 
-function filterTours(tours: MockTour[], tab: FilterTab) {
+function filterTours(tours: MockBookingDetail[], tab: FilterTab) {
   if (tab === 'upcoming')  return tours.filter((t) => t.status === 'pending' || t.status === 'confirmed');
   if (tab === 'active')    return tours.filter((t) => t.status === 'active');
   return tours.filter((t) => t.status === 'completed');
@@ -152,7 +65,7 @@ function MetaRow({ icon, text }: { icon: string; text: string }) {
   );
 }
 
-function TourCard({ tour, onAccept }: { tour: MockTour; onAccept: (t: MockTour) => void }) {
+function TourCard({ tour, onAccept }: { tour: MockBookingDetail; onAccept: (t: MockBookingDetail) => void }) {
   const isPending = tour.status === 'pending';
 
   return (
@@ -178,10 +91,9 @@ function TourCard({ tour, onAccept }: { tour: MockTour; onAccept: (t: MockTour) 
         <Text style={s.tourTitle} numberOfLines={2}>{tour.title}</Text>
 
         <View style={s.metaGroup}>
-          <MetaRow icon="📅" text={`${tour.date} · ${tour.time}`} />
+          <MetaRow icon="📅" text={`${tour.dateLabel} · ${tour.timeRange}`} />
           <MetaRow icon="📍" text={tour.meetingPoint} />
-          <MetaRow icon="👥" text={`${tour.guestCount} khách · ${tour.groupType}`} />
-          <MetaRow icon="🌐" text={`${tour.language}  ·  🎯 ${tour.category}`} />
+          <MetaRow icon="👥" text={`${tour.customer.guestCount} khách · ${tour.customer.language}`} />
         </View>
 
         {/* Earnings row */}
@@ -191,11 +103,11 @@ function TourCard({ tour, onAccept }: { tour: MockTour; onAccept: (t: MockTour) 
           <Text style={s.earningsValue}>{formatVND(tour.guideEarning)}</Text>
         </View>
 
-        {/* Special note */}
-        {tour.specialNote && (
+        {/* Special requests note */}
+        {tour.specialRequests.length > 0 && (
           <View style={s.noteBox}>
             <Ionicons name="warning-outline" size={13} color="#B7791F" />
-            <Text style={s.noteText}>{tour.specialNote}</Text>
+            <Text style={s.noteText}>{tour.specialRequests[0].text}</Text>
           </View>
         )}
 
@@ -214,7 +126,7 @@ function TourCard({ tour, onAccept }: { tour: MockTour; onAccept: (t: MockTour) 
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={s.detailBtn}>
+          <TouchableOpacity style={s.detailBtn} onPress={() => router.push(`/booking/${tour.id}`)}>
             <Text style={s.detailText}>Xem chi tiết tour</Text>
             <Ionicons name="chevron-forward" size={14} color={N.primary} />
           </TouchableOpacity>
@@ -226,7 +138,7 @@ function TourCard({ tour, onAccept }: { tour: MockTour; onAccept: (t: MockTour) 
 
 // ─── Confirm bottom sheet ─────────────────────────────────────────────────────
 
-function ConfirmSheet({ tour, onClose }: { tour: MockTour; onClose: () => void }) {
+function ConfirmSheet({ tour, onClose, onConfirm }: { tour: MockBookingDetail; onClose: () => void; onConfirm: (t: MockBookingDetail) => void }) {
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose} />
@@ -251,10 +163,9 @@ function ConfirmSheet({ tour, onClose }: { tour: MockTour; onClose: () => void }
             </View>
             <View style={s.summaryInfo}>
               <Text style={s.summaryTitle} numberOfLines={2}>{tour.title}</Text>
-              <Text style={s.summaryMeta}>📅 {tour.date} · {tour.time}</Text>
-              <Text style={s.summaryMeta}>👥 {tour.guestCount} khách · {tour.language}</Text>
+              <Text style={s.summaryMeta}>📅 {tour.dateLabel} · {tour.timeRange}</Text>
+              <Text style={s.summaryMeta}>👥 {tour.customer.guestCount} khách · {tour.customer.language}</Text>
               <Text style={s.summaryMeta} numberOfLines={1}>📍 {tour.meetingPoint}</Text>
-              <Text style={s.summaryMeta}>🎯 {tour.category}  ·  👨‍👩‍👧 {tour.groupType}</Text>
             </View>
           </View>
 
@@ -276,11 +187,11 @@ function ConfirmSheet({ tour, onClose }: { tour: MockTour; onClose: () => void }
             </View>
           </View>
 
-          {/* Special note (if any) */}
-          {tour.specialNote && (
+          {/* Special requests (if any) */}
+          {tour.specialRequests.length > 0 && (
             <View style={s.sheetNoteBox}>
               <Ionicons name="warning-outline" size={14} color="#B7791F" />
-              <Text style={s.sheetNoteText}>{tour.specialNote}</Text>
+              <Text style={s.sheetNoteText}>{tour.specialRequests[0].text}</Text>
             </View>
           )}
 
@@ -298,7 +209,7 @@ function ConfirmSheet({ tour, onClose }: { tour: MockTour; onClose: () => void }
           <TouchableOpacity style={s.sheetCancelBtn} onPress={onClose}>
             <Text style={s.sheetCancelText}>Hủy</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.sheetConfirmBtn} onPress={onClose}>
+          <TouchableOpacity style={s.sheetConfirmBtn} onPress={() => onConfirm(tour)}>
             <Ionicons name="checkmark" size={16} color={N.onPrimary} />
             <Text style={s.sheetConfirmText}>Xác nhận nhận tour</Text>
           </TouchableOpacity>
@@ -319,9 +230,20 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 export default function MyToursScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<FilterTab>('upcoming');
-  const [confirmTour, setConfirmTour] = useState<MockTour | null>(null);
+  const [confirmTour, setConfirmTour] = useState<MockBookingDetail | null>(null);
+  const [tours, setTours] = useState<MockBookingDetail[]>(MOCK_BOOKING_DETAILS);
 
-  const filtered = filterTours(MOCK_TOURS, activeTab);
+  useFocusEffect(useCallback(() => {
+    setTours([...MOCK_BOOKING_DETAILS]);
+  }, []));
+
+  function handleConfirm(tour: MockBookingDetail) {
+    updateTourStatus(tour.id, 'confirmed');
+    setConfirmTour(null);
+    router.push(`/booking/${tour.id}`);
+  }
+
+  const filtered = filterTours(tours, activeTab);
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -369,6 +291,7 @@ export default function MyToursScreen() {
             <TourCard tour={item} onAccept={setConfirmTour} />
           )}
         />
+
       )}
 
       {/* Bottom note */}
@@ -383,7 +306,7 @@ export default function MyToursScreen() {
 
       {/* Confirmation sheet */}
       {confirmTour && (
-        <ConfirmSheet tour={confirmTour} onClose={() => setConfirmTour(null)} />
+        <ConfirmSheet tour={confirmTour} onClose={() => setConfirmTour(null)} onConfirm={handleConfirm} />
       )}
     </View>
   );
