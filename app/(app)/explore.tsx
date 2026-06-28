@@ -300,7 +300,7 @@ export default function ExploreScreen() {
       const wasLiked = p.post_likes?.some((l) => l.user_id === user.id);
       return {
         ...p,
-        likes_count: wasLiked ? p.likes_count - 1 : p.likes_count + 1,
+        likes_count: wasLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1,
         post_likes: wasLiked
           ? (p.post_likes ?? []).filter((l) => l.user_id !== user.id)
           : [...(p.post_likes ?? []), { user_id: user.id }],
