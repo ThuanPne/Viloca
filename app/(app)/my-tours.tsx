@@ -337,12 +337,7 @@ export default function MyToursScreen() {
       </View>
 
       {/* Tab chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.tabRow}
-        style={s.tabScroll}
-      >
+      <View style={s.tabRow}>
         {FILTER_TABS.map((tab) => {
           const active = activeTab === tab.key;
           return (
@@ -355,7 +350,7 @@ export default function MyToursScreen() {
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
 
       {/* List */}
       {filtered.length === 0 ? (
@@ -406,8 +401,7 @@ const s = StyleSheet.create({
   filterIconBtn: { padding: 6 },
 
   // Filter tabs
-  tabScroll:   { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: N.outlineVariant },
-  tabRow:      { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
+  tabRow:      { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: N.outlineVariant },
   tabChip:     { paddingHorizontal: 18, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: N.outlineVariant, backgroundColor: N.surface },
   tabChipActive:  { backgroundColor: N.secondaryContainer, borderColor: N.secondaryContainer },
   tabChipText:    { fontSize: 13, fontWeight: '500', color: N.onSurfaceVariant },

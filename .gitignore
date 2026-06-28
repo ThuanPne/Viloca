@@ -11,8 +11,10 @@ dist/
 *.orig.*
 web-build/
 
-# AI / IDE
-.claude/
+# AI / IDE — ignore personal/local settings only, commit shared config
+.claude/settings.local.json
+.claude/skills/
+.idea/
 .idea/
 .cursor/
 .copilot/
