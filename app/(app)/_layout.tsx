@@ -47,6 +47,7 @@ export default function AppLayout() {
           paddingTop: 4,
           paddingBottom: 12,
         },
+        tabBarLabelStyle: { fontSize: 10 },
       }}
     >
       <Tabs.Screen
@@ -64,6 +65,15 @@ export default function AppLayout() {
           title: 'Khám phá',
           tabBarIcon: ({ focused, size }) => (
             <PillIcon name={focused ? 'compass' : 'compass-outline'} focused={focused} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="my-tours"
+        options={{
+          title: 'Tour của tôi',
+          tabBarIcon: ({ focused, size }) => (
+            <PillIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} size={size} />
           ),
         }}
       />
