@@ -109,14 +109,20 @@ export default function BookingDetailScreen() {
     );
   }
 
-  const coverHeight = scrollY.interpolate({
-    inputRange: [0, COVER_MAX - COVER_MIN],
-    outputRange: [COVER_MAX, COVER_MIN],
-    extrapolate: 'clamp',
-  });
-  const coverOpacity = scrollY.interpolate({
+  const coverContentOpacity = scrollY.interpolate({
     inputRange: [0, COVER_MAX - COVER_MIN],
     outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const coverParallax = scrollY.interpolate({
+    inputRange: [0, COVER_MAX],
+    outputRange: [0, -COVER_MAX * 0.4],
+    extrapolate: 'clamp',
+  });
+  // Solid header bg fades in as cover scrolls away (native driver)
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [COVER_MAX - 60, COVER_MAX],
+    outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
@@ -157,28 +163,23 @@ export default function BookingDetailScreen() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  const HEADER_H = 48;
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
 
-      {/* Fixed header */}
-      <View style={s.fixedHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={8}>
-          <Ionicons name="chevron-back" size={22} color={N.onSurface} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Chi tiết Booking</Text>
-        <TouchableOpacity style={s.moreBtn} hitSlop={8}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={N.onSurface} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Collapsible cover */}
-      <Animated.View style={[s.cover, { height: coverHeight }]}>
-        <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      {/* Cover — absolutely positioned, height is fixed (no animation) */}
+      <View style={[s.coverWrap, { top: HEADER_H }]}>
+        <Animated.Image
+          source={{ uri: coverUrl }}
+          style={[StyleSheet.absoluteFill, { transform: [{ translateY: coverParallax }] }]}
+          resizeMode="cover"
+        />
         <LinearGradient
-          colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.55)']}
+          colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.65)']}
           style={StyleSheet.absoluteFill}
         />
-        <Animated.View style={[s.coverContent, { opacity: coverOpacity }]}>
+        <Animated.View style={[s.coverContent, { opacity: coverContentOpacity }]}>
           <View style={s.coverTopRow}>
             <Badge label={STATUS_LABEL[tour.status]} color={STATUS_COLOR[tour.status]} />
             <View style={s.bookingCodeChip}>
@@ -191,14 +192,26 @@ export default function BookingDetailScreen() {
             <Text style={s.coverMeta} numberOfLines={1}>📍 {tour.meetingPoint}</Text>
           </View>
         </Animated.View>
-      </Animated.View>
+      </View>
 
-      {/* Scrollable body */}
+      {/* Fixed header — overlaid on cover with fading solid bg */}
+      <View style={[s.fixedHeader, { height: HEADER_H }]}>
+        <Animated.View style={[s.headerBg, { opacity: headerBgOpacity }]} />
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color="#fff" />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Chi tiết Booking</Text>
+        <TouchableOpacity style={s.moreBtn} hitSlop={8}>
+          <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Scrollable body — paddingTop pushes content below cover */}
       <Animated.ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.scrollContent, { paddingTop: COVER_MAX, paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         scrollEventThrottle={16}
       >
         {/* ── KHÁCH HÀNG ─────────────────────────────────────────────────── */}
@@ -475,19 +488,25 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   noTourText: { fontSize: 16, color: N.onSurfaceVariant },
 
-  // Fixed header
+  // Fixed header — sits above cover (zIndex)
   fixedHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
-    backgroundColor: N.surface, borderBottomWidth: 1, borderBottomColor: N.outlineVariant,
-    zIndex: 10,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
+    zIndex: 20,
+  },
+  headerBg: {
+    ...StyleSheet.absoluteFillObject as object,
+    backgroundColor: N.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: N.outlineVariant,
   },
   backBtn:     { padding: 4 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: N.onSurface },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
   moreBtn:     { padding: 4 },
 
-  // Cover
-  cover:        { overflow: 'hidden', backgroundColor: N.surfaceContainer },
+  // Cover — absolutely positioned, never changes size
+  coverWrap:    { position: 'absolute', left: 0, right: 0, height: COVER_MAX, overflow: 'hidden', backgroundColor: N.surfaceContainer, zIndex: 1 },
   coverContent: { ...StyleSheet.absoluteFillObject as object, padding: spacing.lg, justifyContent: 'space-between' },
   coverTopRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   coverBottomRow: { gap: 4 },
@@ -497,8 +516,8 @@ const s = StyleSheet.create({
   bookingCodeChip: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
   bookingCodeText: { fontSize: 12, color: '#fff', fontWeight: '600' },
 
-  // Scroll
-  scroll:        { flex: 1 },
+  // Scroll — sits on top of cover, transparent so cover shows through paddingTop area
+  scroll:        { flex: 1, zIndex: 2 },
   scrollContent: { gap: 0 },
 
   // Section
