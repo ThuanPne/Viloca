@@ -1,10 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Image, ActivityIndicator, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 import { ScreenWrapper } from '@/src/components/ui/ScreenWrapper';
@@ -26,16 +25,24 @@ const STATUS_COLOR: Record<string, 'warning' | 'forest' | 'neutral'> = {
   completed: 'neutral',
 };
 
+function formatDate(iso: string) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function tripCoverUrl(trip: Trip) {
   return trip.cover_image ?? `https://picsum.photos/seed/trip-${trip.id}/400/200`;
 }
+
+const N = colors.nomad;
 
 export default function WorkspaceScreen() {
   const user = useAuthStore((s) => s.user);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useFocusEffect(useCallback(() => { fetchTrips(); }, [user]));
+  useEffect(() => { fetchTrips(); }, [user]);
 
   async function fetchTrips() {
     setLoading(true);
@@ -48,10 +55,6 @@ export default function WorkspaceScreen() {
       .order('created_at', { ascending: false });
     if (!error) setTrips(data ?? []);
     setLoading(false);
-  }
-
-  function openCreate() {
-    router.push('/create-trip');
   }
 
   function confirmDeleteTrip(trip: Trip) {
@@ -75,7 +78,7 @@ export default function WorkspaceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.nomad.primary} />
+        <ActivityIndicator size="large" color={N.primary} />
       </View>
     );
   }
@@ -88,12 +91,12 @@ export default function WorkspaceScreen() {
           <Text style={styles.subheading}>{trips.length} chuyến đi của bạn</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.aiBtn} onPress={openCreate}>
-            <Ionicons name="sparkles-outline" size={16} color={colors.nomad.primary} />
+          <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/create-trip')}>
+            <Ionicons name="sparkles-outline" size={16} color={N.primary} />
             <Text style={styles.aiText}>AI Plan</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-            <Ionicons name="add" size={20} color={colors.nomad.onPrimary} />
+          <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/create-trip')}>
+            <Ionicons name="add" size={20} color={N.onPrimary} />
             <Text style={styles.addText}>Trip mới</Text>
           </TouchableOpacity>
         </View>
@@ -105,7 +108,7 @@ export default function WorkspaceScreen() {
           title="Chưa có chuyến đi nào"
           body="Tạo trip đầu tiên để bắt đầu lên kế hoạch hành trình của bạn"
           ctaLabel="Tạo Trip đầu tiên"
-          onCta={openCreate}
+          onCta={() => router.push('/create-trip')}
         />
       ) : (
         <FlatList
@@ -113,6 +116,8 @@ export default function WorkspaceScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: spacing.lg, gap: 16 }}
           showsVerticalScrollIndicator={false}
+          onRefresh={fetchTrips}
+          refreshing={loading}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.tripCard}
@@ -147,38 +152,30 @@ export default function WorkspaceScreen() {
           )}
         />
       )}
-
     </ScreenWrapper>
   );
 }
 
-function formatDate(iso: string) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
-
 const styles = StyleSheet.create({
-  center:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
-  heading:        { fontSize: 22, fontWeight: '800', color: colors.nomad.onSurface },
-  subheading:     { fontSize: 13, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
-  headerActions:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aiBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  aiText:         { color: colors.nomad.primary, fontWeight: '600', fontSize: 14 },
-  addBtn:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.nomad.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  addText:        { color: colors.nomad.onPrimary, fontWeight: '600', fontSize: 14 },
+  center:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
+  heading:       { fontSize: 22, fontWeight: '800', color: N.onSurface },
+  subheading:    { fontSize: 13, color: N.onSurfaceVariant, marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aiBtn:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: N.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  aiText:        { color: N.primary, fontWeight: '600', fontSize: 14 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', backgroundColor: N.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
+  addText:       { color: N.onPrimary, fontWeight: '600', fontSize: 14 },
 
-  tripCard:       { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.nomad.surfaceContainerLow, elevation: 2 },
-  tripImageWrap:  { height: 100, overflow: 'hidden' },
-  tripImage:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: 100, resizeMode: 'cover' },
-  tripOverlay:    { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.2)' },
-  tripBadge:      { position: 'absolute', top: 12, right: 12 },
-  aiBadge:        { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
-  aiBadgeText:    { fontSize: 10, color: '#fff', fontWeight: '700' },
-  tripInfo:       { paddingHorizontal: spacing.md, paddingVertical: 6 },
-  tripTitle:      { fontSize: 14, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: 1 },
-  tripDest:       { fontSize: 11, color: colors.nomad.onSurfaceVariant },
-  tripDate:       { fontSize: 11, color: colors.nomad.primary, marginTop: 1, fontWeight: '500' },
-
+  tripCard:      { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: N.surface, elevation: 2 },
+  tripImageWrap: { height: 100, overflow: 'hidden' },
+  tripImage:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: 100, resizeMode: 'cover' },
+  tripOverlay:   { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.2)' },
+  tripBadge:     { position: 'absolute', top: 12, right: 12 },
+  aiBadge:       { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  aiBadgeText:   { fontSize: 10, color: '#fff', fontWeight: '700' },
+  tripInfo:      { paddingHorizontal: spacing.md, paddingVertical: 6 },
+  tripTitle:     { fontSize: 14, fontWeight: '700', color: N.onSurface, marginBottom: 1 },
+  tripDest:      { fontSize: 11, color: N.onSurfaceVariant },
+  tripDate:      { fontSize: 11, color: N.primary, marginTop: 1, fontWeight: '500' },
 });

@@ -82,12 +82,13 @@ export interface Trip {
   user_id: string;
   title: string;
   destination: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   cover_image: string | null;
   status: TripStatus;
   summary_note: string | null;
   place_id: string | null;
+  is_ai_generated: boolean;
   created_at: string;
 }
 
@@ -102,7 +103,9 @@ export interface TripItem {
   experience_category: string | null;
   day_number: number;
   time_slot: TimeSlot;
+  visit_time: string | null;
   note: string | null;
+  ai_reason: string | null;
   sort_order: number;
   // joined via select('*, locations(...)')
   locations?: {
@@ -112,8 +115,13 @@ export interface TripItem {
     short_description: string | null;
     long_description: string | null;
     cover_image: string | null;
+    photos: string | null;
     district: string | null;
     address: string | null;
+    price_per_person: number | null;
+    duration_minutes: number | null;
+    rating: number | null;
+    opening_hours: string | null;
   } | null;
 }
 
@@ -171,4 +179,28 @@ export interface TripJournal {
   mood: 'great' | 'good' | 'okay' | 'tired' | null;
   weather: 'sunny' | 'rainy' | 'cloudy' | null;
   created_at: string;
+}
+
+export interface Post {
+  id: string;
+  user_id: string;
+  content: string | null;
+  images: string[];
+  location_id: string | null;
+  trip_id: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
+  post_likes?: { user_id: string }[];
+}
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
 }

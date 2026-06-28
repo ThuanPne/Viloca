@@ -3,8 +3,9 @@ import {
   View, Text, StyleSheet, TextInput, FlatList,
   TouchableOpacity, ActivityIndicator, ImageBackground,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { setPendingTripLocation } from '@/store/tripPick';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocationSearch, CITY_OPTIONS } from '@/src/hooks/useLocationSearch';
@@ -16,7 +17,7 @@ const INITIAL_COUNT = 5;
 const LOAD_MORE     = 7;
 
 // ─── Result card ─────────────────────────────────────────────────────────────
-function LocationResultCard({ location }: { location: Location }) {
+function LocationResultCard({ location, onPick }: { location: Location; onPick?: (loc: Location) => void }) {
   const firstPhoto = location.photos?.split(',')[0]?.trim();
   const subtitle = [location.district, location.city === 'SG' ? 'TP. HCM' : location.city === 'HN' ? 'Hà Nội' : 'Đà Nẵng'].filter(Boolean).join(', ');
   const firstCategory = location.category?.split(',')[0]?.trim();
@@ -25,7 +26,7 @@ function LocationResultCard({ location }: { location: Location }) {
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.85}
-      onPress={() => router.push(`/location/${location.id}`)}
+      onPress={() => onPick ? onPick(location) : router.push(`/location/${location.id}`)}
     >
       {/* Thumbnail */}
       <ImageBackground
@@ -58,7 +59,13 @@ function LocationResultCard({ location }: { location: Location }) {
         ) : null}
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
+      {onPick ? (
+        <View style={styles.pickBtn}>
+          <Ionicons name="add" size={16} color="#fff" />
+        </View>
+      ) : (
+        <Ionicons name="chevron-forward" size={16} color={colors.nomad.outlineVariant} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -71,6 +78,13 @@ export default function SearchScreen() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetTab, setSheetTab]         = useState<FilterTab>('category');
   const [displayCount, setDisplayCount] = useState(INITIAL_COUNT);
+  const { mode, day, trip_id } = useLocalSearchParams<{ mode?: string; day?: string; trip_id?: string }>();
+  const isPickMode = mode === 'pick';
+
+  function handlePick(loc: Location) {
+    setPendingTripLocation(loc);
+    router.push({ pathname: '/trip/add-location', params: { trip_id: trip_id ?? '', day: day ?? '1' } });
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 100);
@@ -98,7 +112,7 @@ export default function SearchScreen() {
           <TextInput
             ref={inputRef}
             style={styles.input}
-            placeholder="Tìm địa điểm..."
+            placeholder={isPickMode ? `Tìm địa điểm cho Ngày ${day ?? ''}...` : 'Tìm địa điểm...'}
             placeholderTextColor={colors.nomad.outline}
             value={query}
             onChangeText={setQuery}
@@ -111,14 +125,22 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={() => { setSheetTab('hashtag'); setSheetVisible(true); }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="options-outline" size={20} color={colors.nomad.primary} />
-        </TouchableOpacity>
+        {!isPickMode && (
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => { setSheetTab('hashtag'); setSheetVisible(true); }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="options-outline" size={20} color={colors.nomad.primary} />
+          </TouchableOpacity>
+        )}
       </View>
+      {isPickMode && (
+        <View style={styles.pickBanner}>
+          <Ionicons name="add-circle-outline" size={14} color={colors.nomad.primary} />
+          <Text style={styles.pickBannerText}>Chọn địa điểm để thêm vào Ngày {day}</Text>
+        </View>
+      )}
 
       <FilterSheet
         visible={sheetVisible}
@@ -161,19 +183,10 @@ export default function SearchScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => <LocationResultCard location={item} />}
-          ListFooterComponent={
-            hasMore ? (
-              <TouchableOpacity
-                style={styles.loadMoreBtn}
-                onPress={() => setDisplayCount((c) => c + LOAD_MORE)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.loadMoreText}>Xem thêm</Text>
-                <Ionicons name="chevron-down" size={14} color={colors.nomad.primary} />
-              </TouchableOpacity>
-            ) : null
-          }
+          renderItem={({ item }) => <LocationResultCard location={item} onPick={isPickMode ? handlePick : undefined} />}
+          onEndReached={() => hasMore && setDisplayCount((c) => c + LOAD_MORE)}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={hasMore ? <ActivityIndicator color={colors.nomad.primary} style={styles.footerLoader} /> : null}
         />
       )}
     </View>
@@ -240,10 +253,10 @@ const styles = StyleSheet.create({
   },
   categoryPillText: { fontSize: 11, fontWeight: '600', color: colors.nomad.onSurface },
 
-  // Load more
-  loadMoreBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 14, marginTop: 4,
-  },
-  loadMoreText: { fontSize: 14, fontWeight: '600', color: colors.nomad.primary },
+  // Pick mode
+  pickBanner:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#e8f0d8', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  pickBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '600' },
+  pickBtn:        { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
+
+  footerLoader: { paddingVertical: 16 },
 });
