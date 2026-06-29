@@ -53,8 +53,31 @@ export default function WorkspaceScreen() {
       .select('*')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
-    if (!error) setTrips(data ?? []);
+    if (!error) {
+      const resolved = await autoTransitionTrips(data ?? []);
+      setTrips(resolved);
+    }
     setLoading(false);
+  }
+
+  async function autoTransitionTrips(list: Trip[]): Promise<Trip[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const toUpdate = list.filter((t) => {
+      if (!t.start_date) return false;
+      if (t.status === 'planning' && today >= t.start_date) return true;
+      if (t.end_date && today > t.end_date && t.status !== 'completed') return true;
+      return false;
+    });
+    if (toUpdate.length === 0) return list;
+    const updated = await Promise.all(
+      toUpdate.map((t) => {
+        const newStatus = t.end_date && today > t.end_date ? 'completed' : 'active';
+        return supabase.from('trips').update({ status: newStatus }).eq('id', t.id).select().single()
+          .then(({ data }) => data ?? t);
+      })
+    );
+    const updatedMap = new Map(updated.map((t) => [t.id, t]));
+    return list.map((t) => updatedMap.get(t.id) ?? t);
   }
 
   function confirmDeleteTrip(trip: Trip) {

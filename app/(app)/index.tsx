@@ -251,9 +251,14 @@ export default function HomeScreen() {
           <View style={styles.headerLeft}>
             <Image source={require('@/assets/viloca-logo.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Ionicons name="notifications-outline" size={24} color={colors.nomad.onSurface} />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/stats-map')}>
+              <Ionicons name="map-outline" size={24} color={colors.nomad.onSurface} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIcon}>
+              <Ionicons name="notifications-outline" size={24} color={colors.nomad.onSurface} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Greeting */}
@@ -421,7 +426,8 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   logoImg:    { width: 44, height: 44 },
-  headerIcon: { padding: 4 },
+  headerIcon:  { padding: 4 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
   // Greeting
   heroSection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
