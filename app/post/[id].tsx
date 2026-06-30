@@ -61,7 +61,7 @@ export default function PostDetailScreen() {
     if (!post || !user) return;
     if (liked) {
       await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-      setPost({ ...post, likes_count: post.likes_count - 1, post_likes: (post.post_likes ?? []).filter((l) => l.user_id !== user.id) });
+      setPost({ ...post, likes_count: Math.max(0, post.likes_count - 1), post_likes: (post.post_likes ?? []).filter((l) => l.user_id !== user.id) });
     } else {
       await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
       setPost({ ...post, likes_count: post.likes_count + 1, post_likes: [...(post.post_likes ?? []), { user_id: user.id }] });
