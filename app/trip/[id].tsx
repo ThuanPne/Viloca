@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -39,6 +40,14 @@ const MOOD_OPTIONS: { value: 'great' | 'good' | 'okay' | 'tired'; icon: string; 
 const MOOD_ICONS: Record<string, string> = {
   great: '😄', good: '😊', okay: '😐', tired: '😴',
 };
+const WEATHER_OPTIONS: { value: 'sunny' | 'rainy' | 'cloudy'; icon: string; label: string }[] = [
+  { value: 'sunny',  icon: '☀️', label: 'Nắng' },
+  { value: 'rainy',  icon: '🌧', label: 'Mưa' },
+  { value: 'cloudy', icon: '⛅', label: 'Âm' },
+];
+const WEATHER_ICONS: Record<string, string> = {
+  sunny: '☀️', rainy: '🌧', cloudy: '⛅',
+};
 const TIME_SLOTS: { value: TimeSlot; label: string; icon: string }[] = [
   { value: 'morning',   label: 'Sáng',  icon: '🌅' },
   { value: 'afternoon', label: 'Chiều', icon: '☀️' },
@@ -49,6 +58,30 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 const SLOT_BASE_MIN: Record<string, number> = { morning: 7 * 60, afternoon: 13 * 60, evening: 18 * 60 };
+const MAX_JOURNAL_PHOTOS = 6;
+
+type JournalPhoto = { uri: string; mimeType: string; ext: string; base64: string };
+
+function uploadJournalPhoto(photo: JournalPhoto, filename: string, token: string): Promise<boolean> {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+  const anonKey    = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+  if (!photo.base64) return Promise.resolve(false);
+  const binary = atob(photo.base64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Promise<boolean>((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${supabaseUrl}/storage/v1/object/journals/${filename}`, true);
+    xhr.setRequestHeader('apikey', anonKey);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', photo.mimeType);
+    xhr.timeout = 30000;
+    xhr.onload    = () => { resolve(xhr.status < 300); };
+    xhr.onerror   = () => resolve(false);
+    xhr.ontimeout = () => resolve(false);
+    xhr.send(bytes.buffer);
+  });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -393,10 +426,12 @@ export default function TripDetailScreen() {
   const [loading, setLoading]   = useState(true);
 
   // Journal
-  const [journalDay, setJournalDay]       = useState(1);
-  const [journalContent, setJournalContent] = useState('');
-  const [journalMood, setJournalMood]     = useState<'great' | 'good' | 'okay' | 'tired' | null>(null);
-  const [saving, setSaving]               = useState(false);
+  const [journalDay, setJournalDay]           = useState(1);
+  const [journalContent, setJournalContent]   = useState('');
+  const [journalMood, setJournalMood]         = useState<'great' | 'good' | 'okay' | 'tired' | null>(null);
+  const [journalWeather, setJournalWeather]   = useState<'sunny' | 'rainy' | 'cloudy' | null>(null);
+  const [journalLocalPhotos, setJournalLocalPhotos] = useState<JournalPhoto[]>([]);
+  const [saving, setSaving]                   = useState(false);
 
   // Date modal
   const [showDateModal, setShowDateModal] = useState(false);
@@ -443,6 +478,39 @@ export default function TripDetailScreen() {
   const [editStatus, setEditStatus]         = useState<TripStatus>('planning');
   const [savingEdit, setSavingEdit]         = useState(false);
 
+  // Completion modal
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionStats, setCompletionStats] = useState({ days: 0, places: 0, journals: 0 });
+
+
+  async function maybeAutoTransition(t: Trip): Promise<Trip> {
+    if (!t.start_date) return t;
+    const today = new Date().toISOString().split('T')[0];
+    let newStatus = t.status;
+    if (t.status === 'planning' && today >= t.start_date) newStatus = 'active';
+    if (t.end_date && today > t.end_date && t.status !== 'completed') newStatus = 'completed';
+    if (newStatus !== t.status) {
+      const { data } = await supabase.from('trips').update({ status: newStatus }).eq('id', t.id).select().single();
+      const resolved = data ?? t;
+      if (newStatus === 'completed') showTripCompletionModal(resolved);
+      return resolved;
+    }
+    return t;
+  }
+
+  async function showTripCompletionModal(t: Trip) {
+    const tripId = t.id;
+    const [placesRes, journalsRes] = await Promise.all([
+      supabase.from('trip_items').select('*', { count: 'exact', head: true }).eq('trip_id', tripId),
+      supabase.from('trip_journals').select('*', { count: 'exact', head: true }).eq('trip_id', tripId),
+    ]);
+    setCompletionStats({
+      days: tripDayCount(t),
+      places: placesRes.count ?? 0,
+      journals: journalsRes.count ?? 0,
+    });
+    setShowCompletionModal(true);
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -454,11 +522,12 @@ export default function TripDetailScreen() {
         .order('day_number')
         .order('sort_order'),
       supabase.from('trip_journals').select('*').eq('trip_id', id).order('day_number'),
-    ]).then(([t, i, j]) => {
-      setTrip(t.data);
+    ]).then(async ([t, i, j]) => {
+      const resolvedTrip = t.data ? await maybeAutoTransition(t.data) : t.data;
+      setTrip(resolvedTrip);
       setItems(i.data ?? []);
       setJournals(j.data ?? []);
-      if (!t.data?.is_ai_generated) setDismissedAI(true);
+      if (!resolvedTrip?.is_ai_generated) setDismissedAI(true);
       setLoading(false);
     });
   }, [id]);
@@ -481,14 +550,54 @@ export default function TripDetailScreen() {
 
   // ── Journal ───────────────────────────────────────────────────────────────────
 
+  async function pickJournalPhotos() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+      selectionLimit: MAX_JOURNAL_PHOTOS - journalLocalPhotos.length,
+      base64: true,
+    });
+    if (!result.canceled) {
+      const assets: JournalPhoto[] = result.assets.map((a) => {
+        const mime = a.mimeType ?? 'image/jpeg';
+        const ext  = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+        return { uri: a.uri, mimeType: mime === 'image/heic' ? 'image/jpeg' : mime, ext, base64: a.base64 ?? '' };
+      });
+      setJournalLocalPhotos((prev) => [...prev, ...assets].slice(0, MAX_JOURNAL_PHOTOS));
+    }
+  }
+
   async function saveJournal() {
     if (!id || !journalContent.trim()) return;
     setSaving(true);
+
+    let newPhotoUrls: string[] = [];
+    if (journalLocalPhotos.length > 0) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+      const results = await Promise.all(
+        journalLocalPhotos.map((photo, i) => {
+          const filename = `${id}/${journalDay}/${Date.now()}-${i}.${photo.ext}`;
+          return uploadJournalPhoto(photo, filename, token).then((ok) =>
+            ok ? `${supabaseUrl}/storage/v1/object/public/journals/${filename}` : null
+          );
+        })
+      );
+      newPhotoUrls = results.filter((u): u is string => u !== null);
+      if (journalLocalPhotos.length > 0 && newPhotoUrls.length === 0) {
+        Alert.alert('Lỗi upload ảnh', 'Không thể tải ảnh lên. Ghi chú vẫn được lưu.');
+      }
+    }
+
     const existing = journals.find((j) => j.day_number === journalDay);
+    const mergedPhotos = existing ? [...(existing.photos ?? []), ...newPhotoUrls] : newPhotoUrls;
+
     if (existing) {
       const { data } = await supabase
         .from('trip_journals')
-        .update({ content: journalContent, mood: journalMood })
+        .update({ content: journalContent, mood: journalMood, weather: journalWeather, photos: mergedPhotos })
         .eq('id', existing.id)
         .select()
         .single();
@@ -496,7 +605,7 @@ export default function TripDetailScreen() {
     } else {
       const { data } = await supabase
         .from('trip_journals')
-        .insert({ trip_id: id, day_number: journalDay, content: journalContent, photos: [], mood: journalMood, weather: null })
+        .insert({ trip_id: id, day_number: journalDay, content: journalContent, photos: newPhotoUrls, mood: journalMood, weather: journalWeather })
         .select()
         .single();
       if (data) setJournals([...journals, data]);
@@ -504,6 +613,8 @@ export default function TripDetailScreen() {
     setSaving(false);
     setJournalContent('');
     setJournalMood(null);
+    setJournalWeather(null);
+    setJournalLocalPhotos([]);
   }
 
   // ── AI suggest ────────────────────────────────────────────────────────────────
@@ -1015,9 +1126,21 @@ export default function TripDetailScreen() {
               <View key={j.id} style={styles.journalCard}>
                 <View style={styles.journalHeader}>
                   <Text style={styles.journalDay}>Ngày {j.day_number}</Text>
-                  {j.mood && <Text style={{ fontSize: 18 }}>{MOOD_ICONS[j.mood]}</Text>}
+                  <View style={styles.journalIconRow}>
+                    {j.weather && <Text style={styles.journalEmojiIcon}>{WEATHER_ICONS[j.weather]}</Text>}
+                    {j.mood && <Text style={styles.journalEmojiIcon}>{MOOD_ICONS[j.mood]}</Text>}
+                  </View>
                 </View>
                 <Text style={styles.journalContent}>{j.content}</Text>
+                {j.photos && j.photos.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.journalPhotoScroll}>
+                    <View style={styles.journalPhotoRow}>
+                      {j.photos.map((url, idx) => (
+                        <Image key={idx} source={{ uri: url }} style={styles.journalPhotoThumb} />
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
               </View>
             ))}
 
@@ -1036,6 +1159,8 @@ export default function TripDetailScreen() {
                         const existing = journals.find(j => j.day_number === d);
                         setJournalContent(existing?.content ?? '');
                         setJournalMood(existing?.mood ?? null);
+                        setJournalWeather(existing?.weather ?? null);
+                        setJournalLocalPhotos([]);
                       }}
                     >
                       <Text style={[styles.dayBtnText, journalDay === d && styles.dayBtnTextActive]}>{d}</Text>
@@ -1059,6 +1184,21 @@ export default function TripDetailScreen() {
                 ))}
               </View>
 
+              {/* Weather picker */}
+              <Text style={styles.moodLabel}>Thời tiết</Text>
+              <View style={styles.weatherRow}>
+                {WEATHER_OPTIONS.map((w) => (
+                  <TouchableOpacity
+                    key={w.value}
+                    style={[styles.weatherChip, journalWeather === w.value && styles.weatherChipActive]}
+                    onPress={() => setJournalWeather(journalWeather === w.value ? null : w.value)}
+                  >
+                    <Text style={styles.weatherIcon}>{w.icon}</Text>
+                    <Text style={[styles.weatherLabel, journalWeather === w.value && styles.weatherLabelActive]}>{w.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <TextInput
                 style={styles.journalInput}
                 multiline
@@ -1069,6 +1209,32 @@ export default function TripDetailScreen() {
                 onChangeText={setJournalContent}
                 textAlignVertical="top"
               />
+
+              {/* Photo strip */}
+              {journalLocalPhotos.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {journalLocalPhotos.map((p, idx) => (
+                      <View key={p.uri} style={styles.photoThumbWrap}>
+                        <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                        <TouchableOpacity
+                          style={styles.photoRemoveBtn}
+                          onPress={() => setJournalLocalPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                        >
+                          <Ionicons name="close" size={12} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+              {journalLocalPhotos.length < MAX_JOURNAL_PHOTOS && (
+                <TouchableOpacity style={styles.addPhotoBtn} onPress={pickJournalPhotos}>
+                  <Ionicons name="image-outline" size={16} color={colors.nomad.primary} />
+                  <Text style={styles.addPhotoBtnText}>Thêm ảnh</Text>
+                </TouchableOpacity>
+              )}
+
               <Button label="Lưu ghi chú" onPress={saveJournal} loading={saving} />
             </View>
           </View>
@@ -1086,7 +1252,10 @@ export default function TripDetailScreen() {
                   style={[styles.statusBtn, trip.status === opt.value && styles.statusBtnActive]}
                   onPress={async () => {
                     const { data } = await supabase.from('trips').update({ status: opt.value }).eq('id', id!).select().single();
-                    if (data) setTrip(data);
+                    if (data) {
+                      setTrip(data);
+                      if (opt.value === 'completed' && trip.status !== 'completed') showTripCompletionModal(data);
+                    }
                   }}
                 >
                   <Ionicons name={opt.icon as any} size={16} color={trip.status === opt.value ? colors.nomad.primary : colors.textMuted} />
@@ -1320,6 +1489,43 @@ export default function TripDetailScreen() {
         </View>
       </Modal>
 
+      {/* ── Completion Modal ── */}
+      <Modal visible={showCompletionModal} animationType="slide" transparent onRequestClose={() => setShowCompletionModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.completionEmoji}>🎉</Text>
+            <Text style={styles.completionTitle}>Chuyến đi hoàn thành!</Text>
+            {trip?.cover_image && (
+              <Image source={{ uri: trip.cover_image }} style={styles.completionCover} />
+            )}
+            <Text style={styles.completionTripTitle}>{trip?.title}</Text>
+            <Text style={styles.completionMeta}>
+              {trip?.destination}{trip?.start_date ? ` · ${formatDate(trip.start_date)}` : ''}{trip?.end_date ? ` → ${formatDate(trip.end_date)}` : ''}
+            </Text>
+            <View style={styles.completionStats}>
+              <View style={styles.completionStatItem}>
+                <Text style={styles.completionStatValue}>{completionStats.days}</Text>
+                <Text style={styles.completionStatLabel}>ngày{'\n'}hành trình</Text>
+              </View>
+              <View style={styles.completionStatDivider} />
+              <View style={styles.completionStatItem}>
+                <Text style={styles.completionStatValue}>{completionStats.places}</Text>
+                <Text style={styles.completionStatLabel}>địa điểm{'\n'}đã ghé</Text>
+              </View>
+              <View style={styles.completionStatDivider} />
+              <View style={styles.completionStatItem}>
+                <Text style={styles.completionStatValue}>{completionStats.journals}</Text>
+                <Text style={styles.completionStatLabel}>entries{'\n'}journal</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.completionCloseBtn} onPress={() => setShowCompletionModal(false)}>
+              <Text style={styles.completionCloseBtnText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -1475,6 +1681,27 @@ const styles = StyleSheet.create({
   moodBtnLabel:     { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
   moodBtnLabelActive: { color: colors.nomad.primary, fontWeight: '700' },
   journalInput:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 100, marginBottom: spacing.md },
+  journalPhotoThumb:  { width: 64, height: 64, borderRadius: radius.md, resizeMode: 'cover' },
+  journalIconRow:     { flexDirection: 'row', gap: 6 },
+  journalEmojiIcon:   { fontSize: 16 },
+  journalPhotoScroll: { marginTop: 8 },
+  journalPhotoRow:    { flexDirection: 'row', gap: 6 },
+
+  // Weather picker
+  weatherRow:        { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
+  weatherChip:       { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
+  weatherChipActive: { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
+  weatherIcon:       { fontSize: 20, marginBottom: 2 },
+  weatherLabel:      { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
+  weatherLabelActive: { color: colors.nomad.primary, fontWeight: '700' },
+
+  // Photo strip
+  photoStrip:        { marginBottom: spacing.sm },
+  photoThumbWrap:    { position: 'relative' },
+  photoThumb:        { width: 72, height: 72, borderRadius: radius.md, resizeMode: 'cover' },
+  photoRemoveBtn:    { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  addPhotoBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.full, borderWidth: 1, borderColor: colors.nomad.primary, alignSelf: 'flex-start', marginBottom: spacing.md },
+  addPhotoBtnText:   { fontSize: 13, color: colors.nomad.primary, fontWeight: '600' },
 
   // Info
   infoSectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
@@ -1526,5 +1753,19 @@ const styles = StyleSheet.create({
   // Error
   errorBox:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md, borderWidth: 1, borderColor: '#FCA5A5' },
   errorText:  { flex: 1, color: colors.error, fontSize: 12 },
+
+  // Completion modal
+  completionEmoji:       { fontSize: 48, textAlign: 'center', marginBottom: 4 },
+  completionTitle:       { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md },
+  completionCover:       { width: '100%', height: 140, borderRadius: radius.lg, resizeMode: 'cover', marginBottom: spacing.sm },
+  completionTripTitle:   { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  completionMeta:        { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 4, marginBottom: spacing.lg },
+  completionStats:       { flexDirection: 'row', backgroundColor: '#e8f0d8', borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg },
+  completionStatItem:    { flex: 1, alignItems: 'center' },
+  completionStatValue:   { fontSize: 28, fontWeight: '800', color: colors.nomad.primary },
+  completionStatLabel:   { fontSize: 11, color: colors.nomad.primary, textAlign: 'center', marginTop: 2, lineHeight: 16 },
+  completionStatDivider: { width: 1, backgroundColor: colors.nomad.primary + '30', marginHorizontal: 4 },
+  completionCloseBtn:    { backgroundColor: colors.nomad.primary, borderRadius: radius.lg, paddingVertical: 14, alignItems: 'center' },
+  completionCloseBtnText: { fontSize: 15, fontWeight: '700', color: colors.textOnDark },
 
 });
