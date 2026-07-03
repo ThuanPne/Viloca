@@ -3,21 +3,33 @@ export type PlaceRegion = 'north' | 'central' | 'south';
 
 export interface Location {
   id: string;
-  city: string | null;
   name: string;
+  city: string | null;
   district: string | null;
   address: string | null;
+  // Coordinates — populated via geocode script, null until geocoded
+  lat: number | null;
+  lng: number | null;
   google_maps_url: string | null;
   category: string | null;
+  vibes: string[];
   style_tag: string | null;
   price_level: number | null;
+  price_per_person: number | null;
+  duration_minutes: number | null;
+  rating: number | null;
   opening_hours: string | null;
   closing_hours: string | null;
   off_days: string | null;
   phone: string | null;
+  website: string | null;
+  hint: string | null;
   short_description: string | null;
   long_description: string | null;
+  description: string | null;
+  cover_image: string | null;
   photos: string | null;
+  images: string[];
   verified: boolean;
   is_active: boolean;
   created_at: string;
@@ -123,31 +135,6 @@ export interface TripItem {
     rating: number | null;
     opening_hours: string | null;
   } | null;
-}
-
-export interface Location {
-  id: string;
-  name: string;
-  category: string;
-  vibes: string[];
-  hint: string | null;
-  short_description: string | null;
-  long_description: string | null;
-  description: string | null;
-  cover_image: string | null;
-  images: string[];
-  price_per_person: number;
-  duration_minutes: number;
-  rating: number | null;
-  address: string | null;
-  district: string | null;
-  city: string | null;
-  coordinates: { lat: number; lng: number } | null;
-  opening_hours: string | null;
-  phone: string | null;
-  website: string | null;
-  is_active: boolean;
-  created_at: string;
 }
 
 export type BookmarkStatus = 'want' | 'planned' | 'done';

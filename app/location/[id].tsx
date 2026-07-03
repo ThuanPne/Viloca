@@ -261,16 +261,31 @@ export default function LocationDetailScreen() {
 
       {/* ── Bottom bar ─────────────────────────────────────────────── */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={[styles.mapsBtn, !hasMapsUrl && styles.mapsBtnDisabled]}
-          activeOpacity={hasMapsUrl ? 0.85 : 1}
-          onPress={() => hasMapsUrl && Linking.openURL(location.google_maps_url!)}
-        >
-          <Ionicons name="map-outline" size={18} color={hasMapsUrl ? colors.nomad.onPrimary : colors.nomad.outline} />
-          <Text style={[styles.mapsBtnText, !hasMapsUrl && styles.mapsBtnTextDisabled]}>
-            Mở Google Maps
-          </Text>
-        </TouchableOpacity>
+        {location.lat && location.lng ? (
+          <TouchableOpacity
+            style={styles.mapsBtn}
+            activeOpacity={0.85}
+            onPress={() =>
+              router.push(
+                `/map?destLat=${location.lat}&destLng=${location.lng}&destName=${encodeURIComponent(location.name)}`,
+              )
+            }
+          >
+            <Ionicons name="navigate" size={18} color={colors.nomad.onPrimary} />
+            <Text style={styles.mapsBtnText}>Xem bản đồ</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.mapsBtn, !hasMapsUrl && styles.mapsBtnDisabled]}
+            activeOpacity={hasMapsUrl ? 0.85 : 1}
+            onPress={() => hasMapsUrl && Linking.openURL(location.google_maps_url!)}
+          >
+            <Ionicons name="map-outline" size={18} color={hasMapsUrl ? colors.nomad.onPrimary : colors.nomad.outline} />
+            <Text style={[styles.mapsBtnText, !hasMapsUrl && styles.mapsBtnTextDisabled]}>
+              Mở Google Maps
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

@@ -46,8 +46,8 @@ function tripDayCount(trip: Trip): number {
   }
   return 7;
 }
-function buildMapsUrl(loc: Location): string {
-  if (loc.coordinates) return `https://maps.google.com/?q=${loc.coordinates.lat},${loc.coordinates.lng}`;
+function buildGoogleMapsUrl(loc: Location): string {
+  if (loc.lat && loc.lng) return `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
   const q = encodeURIComponent([loc.name, loc.address].filter(Boolean).join(', '));
   return `https://maps.google.com/?q=${q}`;
 }
@@ -305,10 +305,29 @@ export default function ExperienceDetailScreen() {
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.mapsBtn} onPress={() => Linking.openURL(buildMapsUrl(location))} activeOpacity={0.85}>
-          <Ionicons name="map-outline" size={17} color={colors.nomad.onPrimary} />
-          <Text style={styles.mapsBtnText}>Mở Google Maps</Text>
-        </TouchableOpacity>
+        {location.lat && location.lng ? (
+          <TouchableOpacity
+            style={styles.mapsBtn}
+            activeOpacity={0.85}
+            onPress={() =>
+              router.push(
+                `/map?destLat=${location.lat}&destLng=${location.lng}&destName=${encodeURIComponent(location.name)}`,
+              )
+            }
+          >
+            <Ionicons name="navigate" size={17} color={colors.nomad.onPrimary} />
+            <Text style={styles.mapsBtnText}>Xem bản đồ</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.mapsBtn}
+            onPress={() => Linking.openURL(buildGoogleMapsUrl(location))}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="map-outline" size={17} color={colors.nomad.onPrimary} />
+            <Text style={styles.mapsBtnText}>Mở Google Maps</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.addBtn} onPress={openModal} activeOpacity={0.85}>
           <Ionicons name="add-circle-outline" size={17} color={colors.nomad.primary} />
           <Text style={styles.addBtnText}>Thêm vào Trip</Text>

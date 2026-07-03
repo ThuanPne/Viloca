@@ -11,6 +11,9 @@ dist/
 *.orig.*
 web-build/
 
+# Local build cache
+.gradle-home/
+
 # AI / IDE
 .claude/
 .idea/

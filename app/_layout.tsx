@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
+import { setupNotifications } from '@/src/services/notifications';
+import '@/src/tasks/dwellDetectionTask'; // register task at module load time
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -13,6 +15,8 @@ export default function RootLayout() {
   const segments = useSegments();
 
   useEffect(() => {
+    setupNotifications();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
 
