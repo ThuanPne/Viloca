@@ -28,7 +28,7 @@ export default function LoginScreen() {
     setLoading(true);
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (authError) { setError('Email hoặc mật khẩu không đúng'); return; }
+    if (authError) { console.log('LOGIN ERROR:', authError.status, authError.message); setError('Email hoặc mật khẩu không đúng'); return; }
     setUser(data.user);
     router.replace('/(app)');
   }
