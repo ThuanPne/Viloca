@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share,
+  ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share, Linking,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -449,7 +449,7 @@ export default function TripDetailScreen() {
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
       supabase.from('trip_items')
-        .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
+        .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
         .eq('trip_id', id)
         .order('day_number')
         .order('sort_order'),
@@ -675,6 +675,30 @@ export default function TripDetailScreen() {
         },
       ],
     );
+  }
+
+  // ── Google Maps deep-link ─────────────────────────────────────────────────────
+
+  function buildGoogleMapsUrl(dayItems: TripItem[]): string {
+    const sorted = [...dayItems].sort((a, b) => a.sort_order - b.sort_order);
+    const waypoints = sorted.map(item => {
+      const loc = item.locations as any;
+      if (loc?.coordinates?.lat && loc?.coordinates?.lng) {
+        return `${loc.coordinates.lat},${loc.coordinates.lng}`;
+      }
+      if (loc?.address) return encodeURIComponent(loc.address);
+      return null;
+    }).filter(Boolean) as string[];
+
+    if (waypoints.length === 0) return 'https://maps.google.com';
+    if (waypoints.length === 1) {
+      return `https://www.google.com/maps/search/?api=1&query=${waypoints[0]}`;
+    }
+    const origin      = waypoints[0];
+    const destination = waypoints[waypoints.length - 1];
+    const middle      = waypoints.slice(1, -1);
+    const waypointsParam = middle.length > 0 ? `&waypoints=${middle.join('|')}` : '';
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────────
@@ -1143,6 +1167,12 @@ export default function TripDetailScreen() {
         )}
       </Animated.ScrollView>
 
+      {tab === 'timeline' && (itemsByDay[selectedDay] ?? []).length > 0 && (
+        <TouchableOpacity style={styles.fabMap} onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[selectedDay] ?? []))} activeOpacity={0.85}>
+          <Ionicons name="map-outline" size={22} color={colors.textOnDark} />
+        </TouchableOpacity>
+      )}
+
       {tab === 'timeline' && items.length > 0 && (
         <TouchableOpacity style={styles.fab} onPress={() => openAddExp(selectedDay)} activeOpacity={0.85}>
           <Ionicons name="add" size={26} color={colors.textOnDark} />
@@ -1454,7 +1484,8 @@ const styles = StyleSheet.create({
 
 
   // FAB
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fab:    { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fabMap: { position: 'absolute', bottom: 24, left: 24,  width: 50, height: 50, borderRadius: 25, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
 
   // Journal
   journalCard:      { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
