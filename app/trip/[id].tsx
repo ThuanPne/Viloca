@@ -40,10 +40,18 @@ html,body,#map{width:100%;height:100%}
   font-weight:700;font-size:12px;font-family:sans-serif;
   border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)
 }
+#route-status{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);color:#fff;
+  font-size:12px;font-family:sans-serif;
+  padding:4px 10px;border-radius:12px;
+  z-index:1000;display:none;pointer-events:none;
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="route-status">Đang tải lộ trình...</div>
 <script>
 var pts=${data};
 var map=L.map('map',{zoomControl:true});
@@ -58,8 +66,28 @@ else{
     L.marker([m.lat,m.lng],{icon:ic}).addTo(map).bindPopup('<b>'+m.name+'<\/b>');
     lls.push([m.lat,m.lng]);
   });
-  if(lls.length>1)L.polyline(lls,{color:'${PRIMARY}',weight:3,opacity:.85}).addTo(map);
   map.fitBounds(L.latLngBounds(lls),{padding:[40,40]});
+  if(lls.length>1){
+    var statusEl=document.getElementById('route-status');
+    statusEl.style.display='block';
+    // OSRM expects lon,lat order (opposite of Leaflet's lat,lng)
+    var waypoints=pts.map(function(m){return m.lng+','+m.lat;}).join(';');
+    var osrmUrl='https://router.project-osrm.org/route/v1/driving/'+waypoints+'?overview=full&geometries=geojson';
+    fetch(osrmUrl)
+      .then(function(r){return r.json();})
+      .then(function(data){
+        var coords=data.routes[0].geometry.coordinates;
+        // Convert [lon,lat] → [lat,lng] for Leaflet
+        var routeLatLngs=coords.map(function(c){return[c[1],c[0]];});
+        L.polyline(routeLatLngs,{color:'${PRIMARY}',weight:4,opacity:.85}).addTo(map);
+        statusEl.style.display='none';
+      })
+      .catch(function(){
+        // Fallback: straight-line polyline
+        L.polyline(lls,{color:'${PRIMARY}',weight:3,opacity:.7,dashArray:'6,4'}).addTo(map);
+        statusEl.style.display='none';
+      });
+  }
 }
 <\/script>
 </body>
@@ -490,6 +518,7 @@ export default function TripDetailScreen() {
   // Map modal
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
+  const [mapDay, setMapDay] = useState(1);
 
 
   // Edit trip modal
@@ -621,7 +650,7 @@ export default function TripDetailScreen() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     supabase.from('trip_items')
-      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
+      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
       .eq('trip_id', id)
       .order('day_number').order('sort_order')
       .then(({ data }) => { if (data) setItems(data); });
@@ -808,6 +837,14 @@ export default function TripDetailScreen() {
     if (!itemsByDay[item.day_number]) itemsByDay[item.day_number] = [];
     itemsByDay[item.day_number].push(item);
   });
+
+  const daysWithCoords = Object.keys(itemsByDay)
+    .map(Number)
+    .filter(day => (itemsByDay[day] ?? []).some(item => {
+      const loc = item.locations as any;
+      return loc?.coordinates?.lat && loc?.coordinates?.lng;
+    }))
+    .sort((a, b) => a - b);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -1226,7 +1263,7 @@ export default function TripDetailScreen() {
         const loc = item.locations as any;
         return loc?.coordinates?.lat && loc?.coordinates?.lng;
       }) && (
-        <TouchableOpacity style={styles.fabMap} onPress={() => { setMapWebViewLoading(true); setMapModalVisible(true); }} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fabMap} onPress={() => { setMapDay(selectedDay); setMapWebViewLoading(true); setMapModalVisible(true); }} activeOpacity={0.85}>
           <Ionicons name="map-outline" size={22} color={colors.textOnDark} />
         </TouchableOpacity>
       )}
@@ -1242,17 +1279,41 @@ export default function TripDetailScreen() {
         <SafeAreaView style={styles.mapModalContainer}>
           {/* Header */}
           <View style={styles.mapModalHeader}>
-            <Text style={styles.mapModalTitle}>Bản đồ lịch trình</Text>
+            <Text style={styles.mapModalTitle}>{trip ? dayLabel(trip, mapDay) : 'Bản đồ lịch trình'}</Text>
             <TouchableOpacity onPress={() => setMapModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="close" size={24} color={colors.nomad.onSurface} />
             </TouchableOpacity>
           </View>
 
+          {/* Day switcher — only when multiple days have coords */}
+          {daysWithCoords.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.mapDayBar}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            >
+              {daysWithCoords.map(day => (
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.mapDayChip, day === mapDay && styles.mapDayChipActive]}
+                  onPress={() => { setMapWebViewLoading(true); setMapDay(day); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.mapDayChipText, day === mapDay && styles.mapDayChipTextActive]}>
+                    Ngày {day}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
           {/* Map */}
           <View style={{ flex: 1 }}>
             <WebView
+              key={mapDay}
               source={{ html: buildLeafletHtml(
-                (itemsByDay[selectedDay] ?? [])
+                (itemsByDay[mapDay] ?? [])
                   .sort((a, b) => a.sort_order - b.sort_order)
                   .reduce<LeafletMarker[]>((acc, item, idx) => {
                     const loc = item.locations as any;
@@ -1279,7 +1340,7 @@ export default function TripDetailScreen() {
             <TouchableOpacity
               style={styles.mapGoogleBtn}
               activeOpacity={0.85}
-              onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[selectedDay] ?? []))}
+              onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[mapDay] ?? []))}
             >
               <Ionicons name="navigate-outline" size={18} color={colors.nomad.onPrimary} />
               <Text style={styles.mapGoogleBtnText}>Mở Google Maps</Text>
@@ -1690,5 +1751,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, paddingVertical: 14,
   },
   mapGoogleBtnText: { fontSize: 15, fontWeight: '700', color: colors.nomad.onPrimary },
+
+  // Day switcher in map modal
+  mapDayBar: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 10,
+  },
+  mapDayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgCard,
+  },
+  mapDayChipActive: {
+    backgroundColor: colors.nomad.primary,
+    borderColor: colors.nomad.primary,
+  },
+  mapDayChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  mapDayChipTextActive: {
+    color: colors.nomad.onPrimary,
+  },
 
 });
