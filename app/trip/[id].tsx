@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share, Linking,
+  SafeAreaView,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -14,6 +16,55 @@ import { Button } from '@/src/components/ui/Button';
 import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
 import type { Trip, TripItem, TripJournal, TimeSlot, TripStatus } from '@/src/types';
+
+// ─── Leaflet HTML builder ─────────────────────────────────────────────────────
+
+type LeafletMarker = { lat: number; lng: number; name: string; order: number };
+
+function buildLeafletHtml(markers: LeafletMarker[]): string {
+  const PRIMARY = '#45611b';
+  const data = JSON.stringify(markers);
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%}
+.num-icon{
+  width:28px;height:28px;border-radius:50%;
+  background:${PRIMARY};color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:12px;font-family:sans-serif;
+  border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var pts=${data};
+var map=L.map('map',{zoomControl:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap',maxZoom:19
+}).addTo(map);
+if(pts.length===0){map.setView([16.047,108.206],10);}
+else{
+  var lls=[];
+  pts.forEach(function(m){
+    var ic=L.divIcon({html:'<div class="num-icon">'+m.order+'<\/div>',className:'',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-18]});
+    L.marker([m.lat,m.lng],{icon:ic}).addTo(map).bindPopup('<b>'+m.name+'<\/b>');
+    lls.push([m.lat,m.lng]);
+  });
+  if(lls.length>1)L.polyline(lls,{color:'${PRIMARY}',weight:3,opacity:.85}).addTo(map);
+  map.fitBounds(L.latLngBounds(lls),{padding:[40,40]});
+}
+<\/script>
+</body>
+</html>`;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -435,6 +486,10 @@ export default function TripDetailScreen() {
 
   // Detail modal
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
+
+  // Map modal
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
 
 
   // Edit trip modal
@@ -1167,8 +1222,11 @@ export default function TripDetailScreen() {
         )}
       </Animated.ScrollView>
 
-      {tab === 'timeline' && (itemsByDay[selectedDay] ?? []).length > 0 && (
-        <TouchableOpacity style={styles.fabMap} onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[selectedDay] ?? []))} activeOpacity={0.85}>
+      {tab === 'timeline' && (itemsByDay[selectedDay] ?? []).some(item => {
+        const loc = item.locations as any;
+        return loc?.coordinates?.lat && loc?.coordinates?.lng;
+      }) && (
+        <TouchableOpacity style={styles.fabMap} onPress={() => { setMapWebViewLoading(true); setMapModalVisible(true); }} activeOpacity={0.85}>
           <Ionicons name="map-outline" size={22} color={colors.textOnDark} />
         </TouchableOpacity>
       )}
@@ -1178,6 +1236,57 @@ export default function TripDetailScreen() {
           <Ionicons name="add" size={26} color={colors.textOnDark} />
         </TouchableOpacity>
       )}
+
+      {/* ── Map Modal ── */}
+      <Modal visible={mapModalVisible} animationType="slide" statusBarTranslucent onRequestClose={() => setMapModalVisible(false)}>
+        <SafeAreaView style={styles.mapModalContainer}>
+          {/* Header */}
+          <View style={styles.mapModalHeader}>
+            <Text style={styles.mapModalTitle}>Bản đồ lịch trình</Text>
+            <TouchableOpacity onPress={() => setMapModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="close" size={24} color={colors.nomad.onSurface} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Map */}
+          <View style={{ flex: 1 }}>
+            <WebView
+              source={{ html: buildLeafletHtml(
+                (itemsByDay[selectedDay] ?? [])
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .reduce<LeafletMarker[]>((acc, item, idx) => {
+                    const loc = item.locations as any;
+                    if (loc?.coordinates?.lat && loc?.coordinates?.lng) {
+                      acc.push({ lat: loc.coordinates.lat, lng: loc.coordinates.lng, name: loc.name ?? '—', order: idx + 1 });
+                    }
+                    return acc;
+                  }, [])
+              )}}
+              onLoad={() => setMapWebViewLoading(false)}
+              style={{ flex: 1 }}
+              javaScriptEnabled
+              domStorageEnabled
+            />
+            {mapWebViewLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="large" color={colors.nomad.primary} />
+              </View>
+            )}
+          </View>
+
+          {/* Bottom bar */}
+          <View style={styles.mapModalFooter}>
+            <TouchableOpacity
+              style={styles.mapGoogleBtn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[selectedDay] ?? []))}
+            >
+              <Ionicons name="navigate-outline" size={18} color={colors.nomad.onPrimary} />
+              <Text style={styles.mapGoogleBtnText}>Mở Google Maps</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* ── Item Detail Modal ── */}
       <Modal visible={!!selectedItem} animationType="slide" transparent onRequestClose={() => setSelectedItem(null)}>
@@ -1557,5 +1666,29 @@ const styles = StyleSheet.create({
   // Error
   errorBox:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md, borderWidth: 1, borderColor: '#FCA5A5' },
   errorText:  { flex: 1, color: colors.error, fontSize: 12 },
+
+  // Map Modal
+  mapModalContainer: { flex: 1, backgroundColor: colors.bgCard },
+  mapModalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  mapModalTitle: { fontSize: 17, fontWeight: '700', color: colors.nomad.onSurface },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mapModalFooter: {
+    paddingHorizontal: spacing.lg, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  mapGoogleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.nomad.primary,
+    borderRadius: radius.lg, paddingVertical: 14,
+  },
+  mapGoogleBtnText: { fontSize: 15, fontWeight: '700', color: colors.nomad.onPrimary },
 
 });
