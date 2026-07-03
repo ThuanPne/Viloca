@@ -233,7 +233,7 @@ Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (
     const response = await bedrock.send(new ConverseCommand({
       modelId: Deno.env.get('BEDROCK_MODEL_ID') ?? 'qwen.qwen3-235b-a22b-2507-v1:0',
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+      inferenceConfig: { maxTokens: Math.min(4096, days * 200 + 512), temperature: 0.3 },
     }));
     raw = response.output?.message?.content?.[0]?.text?.trim() ?? '';
   } catch (err) {
@@ -252,7 +252,8 @@ Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (
       .trim();
     plan = JSON.parse(cleaned);
   } catch {
-    return new Response(JSON.stringify({ error: 'AI returned invalid JSON', raw }),
+    console.error('[plan-trip] invalid JSON from AI:', raw);
+    return new Response(JSON.stringify({ error: 'AI returned invalid JSON' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
