@@ -16,74 +16,147 @@ import { Button } from '@/src/components/ui/Button';
 import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
 import type { Trip, TripItem, TripJournal, TimeSlot, TripStatus } from '@/src/types';
+import * as Location from 'expo-location';
 
 // ─── Leaflet HTML builder ─────────────────────────────────────────────────────
 
 type LeafletMarker = { lat: number; lng: number; name: string; order: number };
 
-function buildLeafletHtml(markers: LeafletMarker[]): string {
-  const PRIMARY = '#45611b';
-  const data = JSON.stringify(markers);
+function buildLeafletHtml(
+  markers: LeafletMarker[],
+  userLocation?: { lat: number; lng: number } | null,
+): string {
+  const PRIMARY  = '#4285F4';
+  const START_BG = '#34A853';
+  const END_BG   = '#EA4335';
+  const USER_BG  = '#1a73e8';
+  const data     = JSON.stringify(markers);
+  const userLL   = userLocation ? JSON.stringify(userLocation) : 'null';
+
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
-.num-icon{
-  width:28px;height:28px;border-radius:50%;
-  background:${PRIMARY};color:#fff;
+.mk-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mk-pin{
+  width:32px;height:32px;border-radius:50% 50% 50% 0;
+  background:${PRIMARY};
   display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:12px;font-family:sans-serif;
-  border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)
+  transform:rotate(-45deg);
+  border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)
 }
+.mk-pin--start{background:${START_BG}}
+.mk-pin--end{background:${END_BG}}
+.mk-pin .num{
+  transform:rotate(45deg);
+  font-size:13px;font-weight:700;color:#fff;font-family:sans-serif
+}
+.num-label{
+  background:rgba(255,255,255,.92);
+  color:#222;font-size:10px;font-family:sans-serif;font-weight:600;
+  padding:1px 5px;border-radius:4px;
+  white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 1px 3px rgba(0,0,0,.2)
+}
+.user-dot-wrap{position:relative;width:20px;height:20px}
+.user-dot{
+  width:16px;height:16px;border-radius:50%;
+  background:${USER_BG};border:2.5px solid #fff;
+  position:absolute;top:2px;left:2px;
+  box-shadow:0 1px 4px rgba(0,0,0,.3)
+}
+.user-pulse{
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(26,115,232,.3);
+  position:absolute;top:0;left:0;
+  animation:pulse 2s ease-out infinite
+}
+@keyframes pulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.5);opacity:0}}
 #route-status{
-  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.55);color:#fff;
   font-size:12px;font-family:sans-serif;
-  padding:4px 10px;border-radius:12px;
+  padding:4px 12px;border-radius:12px;
+  z-index:1000;display:none;pointer-events:none
+}
+#info-bar{
+  position:absolute;bottom:8px;left:8px;
+  background:rgba(255,255,255,.93);
+  color:#333;font-size:12px;font-family:sans-serif;font-weight:600;
+  padding:5px 10px;border-radius:10px;
   z-index:1000;display:none;pointer-events:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.2)
 }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="route-status">Đang tải lộ trình...</div>
+<div id="info-bar"></div>
 <script>
 var pts=${data};
-var map=L.map('map',{zoomControl:true});
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap',maxZoom:19
+var userLL=${userLL};
+var map=L.map('map',{zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap contributors © CARTO',maxZoom:19,subdomains:'abcd'
 }).addTo(map);
+
+// Blue dot — user location (drawn first, below markers)
+if(userLL){
+  var udIcon=L.divIcon({
+    html:'<div class="user-dot-wrap"><div class="user-pulse"><\/div><div class="user-dot"><\/div><\/div>',
+    className:'',iconSize:[20,20],iconAnchor:[10,10]
+  });
+  L.marker([userLL.lat,userLL.lng],{icon:udIcon,zIndexOffset:-100}).addTo(map)
+    .bindPopup('<b>Vị trí của bạn<\/b>');
+}
+
 if(pts.length===0){map.setView([16.047,108.206],10);}
 else{
   var lls=[];
-  pts.forEach(function(m){
-    var ic=L.divIcon({html:'<div class="num-icon">'+m.order+'<\/div>',className:'',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-18]});
+  pts.forEach(function(m,i){
+    var isStart=(m.order===1);
+    var isEnd=(m.order===pts.length);
+    var pinCls='mk-pin'+(isStart?' mk-pin--start':isEnd?' mk-pin--end':'');
+    var iconHtml='<div class="mk-wrap"><div class="'+pinCls+'"><span class="num">'+m.order+'<\/span><\/div><div class="num-label">'+m.name+'<\/div><\/div>';
+    var ic=L.divIcon({html:iconHtml,className:'',iconSize:[90,58],iconAnchor:[45,42],popupAnchor:[0,-44]});
     L.marker([m.lat,m.lng],{icon:ic}).addTo(map).bindPopup('<b>'+m.name+'<\/b>');
     lls.push([m.lat,m.lng]);
   });
-  map.fitBounds(L.latLngBounds(lls),{padding:[40,40]});
+  // fitBounds only on trip markers, not user location
+  map.fitBounds(L.latLngBounds(lls),{padding:[48,48]});
+
   if(lls.length>1){
     var statusEl=document.getElementById('route-status');
+    var infoEl=document.getElementById('info-bar');
     statusEl.style.display='block';
-    // OSRM expects lon,lat order (opposite of Leaflet's lat,lng)
     var waypoints=pts.map(function(m){return m.lng+','+m.lat;}).join(';');
     var osrmUrl='https://router.project-osrm.org/route/v1/driving/'+waypoints+'?overview=full&geometries=geojson';
     fetch(osrmUrl)
       .then(function(r){return r.json();})
-      .then(function(data){
-        var coords=data.routes[0].geometry.coordinates;
-        // Convert [lon,lat] → [lat,lng] for Leaflet
-        var routeLatLngs=coords.map(function(c){return[c[1],c[0]];});
-        L.polyline(routeLatLngs,{color:'${PRIMARY}',weight:4,opacity:.85}).addTo(map);
+      .then(function(d){
+        var coords=d.routes[0].geometry.coordinates;
+        var routeLL=coords.map(function(c){return[c[1],c[0]];});
+        L.polyline(routeLL,{color:'#ffffff',weight:9,opacity:1}).addTo(map);
+        var pl=L.polyline(routeLL,{color:'${PRIMARY}',weight:5,opacity:.95}).addTo(map);
+        // Direction arrows
+        L.polylineDecorator(pl,{
+          patterns:[{offset:'12%',repeat:'22%',symbol:L.Symbol.arrowHead({pixelSize:10,polygon:false,pathOptions:{color:'${PRIMARY}',weight:2,opacity:.8}})}]
+        }).addTo(map);
+        // Info bar
+        var km=(d.routes[0].distance/1000).toFixed(1);
+        var min=Math.round(d.routes[0].duration/60);
+        infoEl.textContent=km+' km  ·  ~'+min+' phút';
+        infoEl.style.display='block';
         statusEl.style.display='none';
       })
       .catch(function(){
-        // Fallback: straight-line polyline
         L.polyline(lls,{color:'${PRIMARY}',weight:3,opacity:.7,dashArray:'6,4'}).addTo(map);
         statusEl.style.display='none';
       });
@@ -519,6 +592,7 @@ export default function TripDetailScreen() {
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
   const [mapDay, setMapDay] = useState(1);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
 
   // Edit trip modal
@@ -783,6 +857,25 @@ export default function TripDetailScreen() {
     const middle      = waypoints.slice(1, -1);
     const waypointsParam = middle.length > 0 ? `&waypoints=${middle.join('|')}` : '';
     return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+  }
+
+  // ── Open map with location permission ────────────────────────────────────────
+
+  async function openMapWithLocation(day: number) {
+    setMapDay(day);
+    setMapWebViewLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      } else {
+        setUserLocation(null);
+      }
+    } catch {
+      setUserLocation(null);
+    }
+    setMapModalVisible(true);
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────────
@@ -1052,12 +1145,6 @@ export default function TripDetailScreen() {
                           <Text style={styles.dayAddText}>{editMode ? 'Xong' : 'Chỉnh sửa'}</Text>
                         </TouchableOpacity>
                       )}
-                      {!editMode && (
-                        <TouchableOpacity style={styles.dayAddBtn} onPress={() => openAddExp(selectedDay)}>
-                          <Ionicons name="add" size={14} color={colors.nomad.primary} />
-                          <Text style={styles.dayAddText}>Thêm</Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
 
@@ -1263,7 +1350,7 @@ export default function TripDetailScreen() {
         const loc = item.locations as any;
         return loc?.coordinates?.lat && loc?.coordinates?.lng;
       }) && (
-        <TouchableOpacity style={styles.fabMap} onPress={() => { setMapDay(selectedDay); setMapWebViewLoading(true); setMapModalVisible(true); }} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fabMap} onPress={() => openMapWithLocation(selectedDay)} activeOpacity={0.85}>
           <Ionicons name="map-outline" size={22} color={colors.textOnDark} />
         </TouchableOpacity>
       )}
@@ -1321,7 +1408,8 @@ export default function TripDetailScreen() {
                       acc.push({ lat: loc.coordinates.lat, lng: loc.coordinates.lng, name: loc.name ?? '—', order: idx + 1 });
                     }
                     return acc;
-                  }, [])
+                  }, []),
+                userLocation,
               )}}
               onLoad={() => setMapWebViewLoading(false)}
               style={{ flex: 1 }}
