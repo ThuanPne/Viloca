@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share,
+  ScrollView, TextInput, ActivityIndicator, Image, ImageBackground, Modal, Animated, Alert, Share, Linking,
+  SafeAreaView,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -14,6 +16,156 @@ import { Button } from '@/src/components/ui/Button';
 import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
 import type { Trip, TripItem, TripJournal, TimeSlot, TripStatus } from '@/src/types';
+import * as Location from 'expo-location';
+
+// ─── Leaflet HTML builder ─────────────────────────────────────────────────────
+
+type LeafletMarker = { lat: number; lng: number; name: string; order: number };
+
+function buildLeafletHtml(
+  markers: LeafletMarker[],
+  userLocation?: { lat: number; lng: number } | null,
+): string {
+  const PRIMARY  = '#4285F4';
+  const START_BG = '#34A853';
+  const END_BG   = '#EA4335';
+  const USER_BG  = '#1a73e8';
+  const data     = JSON.stringify(markers);
+  const userLL   = userLocation ? JSON.stringify(userLocation) : 'null';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%}
+.mk-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mk-pin{
+  width:32px;height:32px;border-radius:50% 50% 50% 0;
+  background:${PRIMARY};
+  display:flex;align-items:center;justify-content:center;
+  transform:rotate(-45deg);
+  border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)
+}
+.mk-pin--start{background:${START_BG}}
+.mk-pin--end{background:${END_BG}}
+.mk-pin .num{
+  transform:rotate(45deg);
+  font-size:13px;font-weight:700;color:#fff;font-family:sans-serif
+}
+.num-label{
+  background:rgba(255,255,255,.92);
+  color:#222;font-size:10px;font-family:sans-serif;font-weight:600;
+  padding:1px 5px;border-radius:4px;
+  white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 1px 3px rgba(0,0,0,.2)
+}
+.user-dot-wrap{position:relative;width:20px;height:20px}
+.user-dot{
+  width:16px;height:16px;border-radius:50%;
+  background:${USER_BG};border:2.5px solid #fff;
+  position:absolute;top:2px;left:2px;
+  box-shadow:0 1px 4px rgba(0,0,0,.3)
+}
+.user-pulse{
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(26,115,232,.3);
+  position:absolute;top:0;left:0;
+  animation:pulse 2s ease-out infinite
+}
+@keyframes pulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+#route-status{
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);color:#fff;
+  font-size:12px;font-family:sans-serif;
+  padding:4px 12px;border-radius:12px;
+  z-index:1000;display:none;pointer-events:none
+}
+#info-bar{
+  position:absolute;bottom:8px;left:8px;
+  background:rgba(255,255,255,.93);
+  color:#333;font-size:12px;font-family:sans-serif;font-weight:600;
+  padding:5px 10px;border-radius:10px;
+  z-index:1000;display:none;pointer-events:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.2)
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="route-status">Đang tải lộ trình...</div>
+<div id="info-bar"></div>
+<script>
+var pts=${data};
+var userLL=${userLL};
+var map=L.map('map',{zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap contributors © CARTO',maxZoom:19,subdomains:'abcd'
+}).addTo(map);
+
+// Blue dot — user location (drawn first, below markers)
+if(userLL){
+  var udIcon=L.divIcon({
+    html:'<div class="user-dot-wrap"><div class="user-pulse"><\/div><div class="user-dot"><\/div><\/div>',
+    className:'',iconSize:[20,20],iconAnchor:[10,10]
+  });
+  L.marker([userLL.lat,userLL.lng],{icon:udIcon,zIndexOffset:-100}).addTo(map)
+    .bindPopup('<b>Vị trí của bạn<\/b>');
+}
+
+if(pts.length===0){map.setView([16.047,108.206],10);}
+else{
+  var lls=[];
+  pts.forEach(function(m,i){
+    var isStart=(m.order===1);
+    var isEnd=(m.order===pts.length);
+    var pinCls='mk-pin'+(isStart?' mk-pin--start':isEnd?' mk-pin--end':'');
+    var iconHtml='<div class="mk-wrap"><div class="'+pinCls+'"><span class="num">'+m.order+'<\/span><\/div><div class="num-label">'+m.name+'<\/div><\/div>';
+    var ic=L.divIcon({html:iconHtml,className:'',iconSize:[90,58],iconAnchor:[45,42],popupAnchor:[0,-44]});
+    L.marker([m.lat,m.lng],{icon:ic}).addTo(map).bindPopup('<b>'+m.name+'<\/b>');
+    lls.push([m.lat,m.lng]);
+  });
+  // fitBounds only on trip markers, not user location
+  map.fitBounds(L.latLngBounds(lls),{padding:[48,48]});
+
+  if(lls.length>1){
+    var statusEl=document.getElementById('route-status');
+    var infoEl=document.getElementById('info-bar');
+    statusEl.style.display='block';
+    var waypoints=pts.map(function(m){return m.lng+','+m.lat;}).join(';');
+    var osrmUrl='https://router.project-osrm.org/route/v1/driving/'+waypoints+'?overview=full&geometries=geojson';
+    fetch(osrmUrl)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var coords=d.routes[0].geometry.coordinates;
+        var routeLL=coords.map(function(c){return[c[1],c[0]];});
+        L.polyline(routeLL,{color:'#ffffff',weight:9,opacity:1}).addTo(map);
+        var pl=L.polyline(routeLL,{color:'${PRIMARY}',weight:5,opacity:.95}).addTo(map);
+        // Direction arrows
+        L.polylineDecorator(pl,{
+          patterns:[{offset:'12%',repeat:'22%',symbol:L.Symbol.arrowHead({pixelSize:10,polygon:false,pathOptions:{color:'${PRIMARY}',weight:2,opacity:.8}})}]
+        }).addTo(map);
+        // Info bar
+        var km=(d.routes[0].distance/1000).toFixed(1);
+        var min=Math.round(d.routes[0].duration/60);
+        infoEl.textContent=km+' km  ·  ~'+min+' phút';
+        infoEl.style.display='block';
+        statusEl.style.display='none';
+      })
+      .catch(function(){
+        L.polyline(lls,{color:'${PRIMARY}',weight:3,opacity:.7,dashArray:'6,4'}).addTo(map);
+        statusEl.style.display='none';
+      });
+  }
+}
+<\/script>
+</body>
+</html>`;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -436,6 +588,12 @@ export default function TripDetailScreen() {
   // Detail modal
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
 
+  // Map modal
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
+  const [mapDay, setMapDay] = useState(1);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
 
   // Edit trip modal
   const [showEditModal, setShowEditModal]   = useState(false);
@@ -449,7 +607,7 @@ export default function TripDetailScreen() {
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
       supabase.from('trip_items')
-        .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
+        .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
         .eq('trip_id', id)
         .order('day_number')
         .order('sort_order'),
@@ -566,7 +724,7 @@ export default function TripDetailScreen() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     supabase.from('trip_items')
-      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
+      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
       .eq('trip_id', id)
       .order('day_number').order('sort_order')
       .then(({ data }) => { if (data) setItems(data); });
@@ -677,6 +835,49 @@ export default function TripDetailScreen() {
     );
   }
 
+  // ── Google Maps deep-link ─────────────────────────────────────────────────────
+
+  function buildGoogleMapsUrl(dayItems: TripItem[]): string {
+    const sorted = [...dayItems].sort((a, b) => a.sort_order - b.sort_order);
+    const waypoints = sorted.map(item => {
+      const loc = item.locations as any;
+      if (loc?.coordinates?.lat && loc?.coordinates?.lng) {
+        return `${loc.coordinates.lat},${loc.coordinates.lng}`;
+      }
+      if (loc?.address) return encodeURIComponent(loc.address);
+      return null;
+    }).filter(Boolean) as string[];
+
+    if (waypoints.length === 0) return 'https://maps.google.com';
+    if (waypoints.length === 1) {
+      return `https://www.google.com/maps/search/?api=1&query=${waypoints[0]}`;
+    }
+    const origin      = waypoints[0];
+    const destination = waypoints[waypoints.length - 1];
+    const middle      = waypoints.slice(1, -1);
+    const waypointsParam = middle.length > 0 ? `&waypoints=${middle.join('|')}` : '';
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+  }
+
+  // ── Open map with location permission ────────────────────────────────────────
+
+  async function openMapWithLocation(day: number) {
+    setMapDay(day);
+    setMapWebViewLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      } else {
+        setUserLocation(null);
+      }
+    } catch {
+      setUserLocation(null);
+    }
+    setMapModalVisible(true);
+  }
+
   // ── Share ─────────────────────────────────────────────────────────────────────
 
   function shareItinerary() {
@@ -729,6 +930,14 @@ export default function TripDetailScreen() {
     if (!itemsByDay[item.day_number]) itemsByDay[item.day_number] = [];
     itemsByDay[item.day_number].push(item);
   });
+
+  const daysWithCoords = Object.keys(itemsByDay)
+    .map(Number)
+    .filter(day => (itemsByDay[day] ?? []).some(item => {
+      const loc = item.locations as any;
+      return loc?.coordinates?.lat && loc?.coordinates?.lng;
+    }))
+    .sort((a, b) => a - b);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -936,12 +1145,6 @@ export default function TripDetailScreen() {
                           <Text style={styles.dayAddText}>{editMode ? 'Xong' : 'Chỉnh sửa'}</Text>
                         </TouchableOpacity>
                       )}
-                      {!editMode && (
-                        <TouchableOpacity style={styles.dayAddBtn} onPress={() => openAddExp(selectedDay)}>
-                          <Ionicons name="add" size={14} color={colors.nomad.primary} />
-                          <Text style={styles.dayAddText}>Thêm</Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
 
@@ -1143,11 +1346,96 @@ export default function TripDetailScreen() {
         )}
       </Animated.ScrollView>
 
+      {tab === 'timeline' && (itemsByDay[selectedDay] ?? []).some(item => {
+        const loc = item.locations as any;
+        return loc?.coordinates?.lat && loc?.coordinates?.lng;
+      }) && (
+        <TouchableOpacity style={styles.fabMap} onPress={() => openMapWithLocation(selectedDay)} activeOpacity={0.85}>
+          <Ionicons name="map-outline" size={22} color={colors.textOnDark} />
+        </TouchableOpacity>
+      )}
+
       {tab === 'timeline' && items.length > 0 && (
         <TouchableOpacity style={styles.fab} onPress={() => openAddExp(selectedDay)} activeOpacity={0.85}>
           <Ionicons name="add" size={26} color={colors.textOnDark} />
         </TouchableOpacity>
       )}
+
+      {/* ── Map Modal ── */}
+      <Modal visible={mapModalVisible} animationType="slide" statusBarTranslucent onRequestClose={() => setMapModalVisible(false)}>
+        <SafeAreaView style={styles.mapModalContainer}>
+          {/* Header */}
+          <View style={styles.mapModalHeader}>
+            <Text style={styles.mapModalTitle}>{trip ? dayLabel(trip, mapDay) : 'Bản đồ lịch trình'}</Text>
+            <TouchableOpacity onPress={() => setMapModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="close" size={24} color={colors.nomad.onSurface} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Day switcher — only when multiple days have coords */}
+          {daysWithCoords.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.mapDayBar}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            >
+              {daysWithCoords.map(day => (
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.mapDayChip, day === mapDay && styles.mapDayChipActive]}
+                  onPress={() => { setMapWebViewLoading(true); setMapDay(day); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.mapDayChipText, day === mapDay && styles.mapDayChipTextActive]}>
+                    Ngày {day}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Map */}
+          <View style={{ flex: 1 }}>
+            <WebView
+              key={mapDay}
+              source={{ html: buildLeafletHtml(
+                (itemsByDay[mapDay] ?? [])
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .reduce<LeafletMarker[]>((acc, item, idx) => {
+                    const loc = item.locations as any;
+                    if (loc?.coordinates?.lat && loc?.coordinates?.lng) {
+                      acc.push({ lat: loc.coordinates.lat, lng: loc.coordinates.lng, name: loc.name ?? '—', order: idx + 1 });
+                    }
+                    return acc;
+                  }, []),
+                userLocation,
+              )}}
+              onLoad={() => setMapWebViewLoading(false)}
+              style={{ flex: 1 }}
+              javaScriptEnabled
+              domStorageEnabled
+            />
+            {mapWebViewLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="large" color={colors.nomad.primary} />
+              </View>
+            )}
+          </View>
+
+          {/* Bottom bar */}
+          <View style={styles.mapModalFooter}>
+            <TouchableOpacity
+              style={styles.mapGoogleBtn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(buildGoogleMapsUrl(itemsByDay[mapDay] ?? []))}
+            >
+              <Ionicons name="navigate-outline" size={18} color={colors.nomad.onPrimary} />
+              <Text style={styles.mapGoogleBtnText}>Mở Google Maps</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* ── Item Detail Modal ── */}
       <Modal visible={!!selectedItem} animationType="slide" transparent onRequestClose={() => setSelectedItem(null)}>
@@ -1454,7 +1742,8 @@ const styles = StyleSheet.create({
 
 
   // FAB
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fab:    { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
+  fabMap: { position: 'absolute', bottom: 24, left: 24,  width: 50, height: 50, borderRadius: 25, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
 
   // Journal
   journalCard:      { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
@@ -1526,5 +1815,57 @@ const styles = StyleSheet.create({
   // Error
   errorBox:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md, borderWidth: 1, borderColor: '#FCA5A5' },
   errorText:  { flex: 1, color: colors.error, fontSize: 12 },
+
+  // Map Modal
+  mapModalContainer: { flex: 1, backgroundColor: colors.bgCard },
+  mapModalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  mapModalTitle: { fontSize: 17, fontWeight: '700', color: colors.nomad.onSurface },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mapModalFooter: {
+    paddingHorizontal: spacing.lg, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  mapGoogleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.nomad.primary,
+    borderRadius: radius.lg, paddingVertical: 14,
+  },
+  mapGoogleBtnText: { fontSize: 15, fontWeight: '700', color: colors.nomad.onPrimary },
+
+  // Day switcher in map modal
+  mapDayBar: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 10,
+  },
+  mapDayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgCard,
+  },
+  mapDayChipActive: {
+    backgroundColor: colors.nomad.primary,
+    borderColor: colors.nomad.primary,
+  },
+  mapDayChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  mapDayChipTextActive: {
+    color: colors.nomad.onPrimary,
+  },
 
 });

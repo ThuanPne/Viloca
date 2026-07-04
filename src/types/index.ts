@@ -134,6 +134,7 @@ export interface TripItem {
     duration_minutes: number | null;
     rating: number | null;
     opening_hours: string | null;
+    coordinates: { lat: number; lng: number } | null;
   } | null;
 }
 
