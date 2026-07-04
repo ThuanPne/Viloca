@@ -210,7 +210,7 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
       <View style={s.postActions}>
         <TouchableOpacity style={s.actionBtn} onPress={() => onLike(post)} activeOpacity={0.7}>
           <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? '#EF4444' : colors.nomad.onSurfaceVariant} />
-          <Text style={[s.actionCount, liked && { color: '#EF4444' }]}>{post.likes_count}</Text>
+          <Text style={[s.actionCount, liked && { color: '#EF4444' }]}>{post.post_likes?.length ?? post.likes_count}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.actionBtn} onPress={() => !isMock && router.push(`/post/${post.id}`)} activeOpacity={0.7}>
           <Ionicons name="chatbubble-outline" size={21} color={colors.nomad.onSurfaceVariant} />
@@ -300,7 +300,7 @@ export default function ExploreScreen() {
       const wasLiked = p.post_likes?.some((l) => l.user_id === user.id);
       return {
         ...p,
-        likes_count: wasLiked ? p.likes_count - 1 : p.likes_count + 1,
+        likes_count: wasLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1,
         post_likes: wasLiked
           ? (p.post_likes ?? []).filter((l) => l.user_id !== user.id)
           : [...(p.post_likes ?? []), { user_id: user.id }],

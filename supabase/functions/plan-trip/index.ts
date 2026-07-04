@@ -98,12 +98,31 @@ Deno.serve(async (req) => {
 
   const COLS = 'id, name, category, vibes, price_per_person, duration_minutes, rating, hint, district';
 
+  // Normalize destination to canonical Vietnamese city/province name for reliable ilike matching
+  function normalizeDestination(dest: string): string {
+    if (/hcm|tphcm|tp\.hcm|tp hcm|hồ chí minh|ho chi minh/i.test(dest)) return 'Hồ Chí Minh';
+    if (/hà nội|ha noi|hanoi/i.test(dest)) return 'Hà Nội';
+    if (/đà nẵng|da nang|danang/i.test(dest)) return 'Đà Nẵng';
+    if (/hội an|hoi an/i.test(dest)) return 'Hội An';
+    if (/đà lạt|da lat|dalat/i.test(dest)) return 'Đà Lạt';
+    if (/phú quốc|phu quoc/i.test(dest)) return 'Phú Quốc';
+    if (/nha trang/i.test(dest)) return 'Nha Trang';
+    if (/huế|hue\b/i.test(dest)) return 'Huế';
+    if (/cần thơ|can tho/i.test(dest)) return 'Cần Thơ';
+    if (/hạ long|ha long|halong/i.test(dest)) return 'Hạ Long';
+    if (/đắk lắk|dak lak/i.test(dest)) return 'Đắk Lắk';
+    if (/khánh hòa|khanh hoa/i.test(dest)) return 'Khánh Hòa';
+    return dest.trim();
+  }
+
+  const normDest = normalizeDestination(destination);
+
   // Primary: destination + budget + vibes
   const { data: locations, error: locErr } = await supabase
     .from('locations')
     .select(COLS)
     .eq('is_active', true)
-    .ilike('address', `%${destination}%`)
+    .ilike('address', `%${normDest}%`)
     .lte('price_per_person', budget_per_person)
     .overlaps('vibes', vibes);
 
@@ -112,27 +131,21 @@ Deno.serve(async (req) => {
     // Fallback 1: destination + budget, relax vibes
     const { data: fb1 } = await supabase
       .from('locations').select(COLS).eq('is_active', true)
-      .ilike('address', `%${destination}%`).lte('price_per_person', budget_per_person);
+      .ilike('address', `%${normDest}%`).lte('price_per_person', budget_per_person);
     if (fb1?.length) {
       finalLocations = fb1;
     } else {
-      // Fallback 2: destination only
-      const { data: fb2 } = await supabase
+      // Fallback 2: destination only (still scoped to destination — no cross-city fallback)
+      const { data: fb2, error: fb2Err } = await supabase
         .from('locations').select(COLS).eq('is_active', true)
-        .ilike('address', `%${destination}%`);
+        .ilike('address', `%${normDest}%`);
       if (fb2?.length) {
         finalLocations = fb2;
       } else {
-        // Fallback 3: no location filter
-        const { data: fb3, error: fb3Err } = await supabase
-          .from('locations').select(COLS).eq('is_active', true);
-        if (!fb3?.length) {
-          return new Response(
-            JSON.stringify({ error: 'Database has no active locations.', detail: locErr?.message ?? fb3Err?.message }),
-            { status: 404, headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-        finalLocations = fb3;
+        return new Response(
+          JSON.stringify({ error: `Không tìm thấy địa điểm tại ${destination} trong hệ thống.`, detail: locErr?.message ?? fb2Err?.message }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } },
+        );
       }
     }
   }
@@ -199,7 +212,7 @@ ${departureLine}
 === DANH SÁCH ĐỊA ĐIỂM (CHỈ dùng location_id từ đây) ===
 ${JSON.stringify(locationMeta, null, 2)}
 
-=== 9 NGUYÊN TẮC BẮT BUỘC ===
+=== 10 NGUYÊN TẮC BẮT BUỘC ===
 1. KHÔNG ĐƯỢC bịa location_id — chỉ dùng uuid có trong danh sách trên
 2. Không lặp địa điểm (mỗi uuid xuất hiện tối đa 1 lần)
 3. price_per_person của mọi địa điểm phải ≤ ${budget_per_person.toLocaleString('vi-VN')}đ — lọc nghiêm ngặt
@@ -209,6 +222,7 @@ ${JSON.stringify(locationMeta, null, 2)}
 7. Ngày cuối: kết thúc gần điểm xuất phát, ưu tiên Ẩm thực/Café, tránh địa điểm xa
 8. Ưu tiên địa điểm có rating cao và vibes phù hợp [${vibes.join(', ')}]
 9. Số slot/ngày: ${slotsPerDay} (sáng/chiều/tối)
+10. TUYỆT ĐỐI chỉ chọn địa điểm thuộc ${destination} — loại bỏ mọi địa điểm ở tỉnh/thành phố khác
 
 Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (1 câu) trong field "reason".
 

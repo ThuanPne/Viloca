@@ -61,7 +61,7 @@ export default function PostDetailScreen() {
     if (!post || !user) return;
     if (liked) {
       await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-      setPost({ ...post, likes_count: post.likes_count - 1, post_likes: (post.post_likes ?? []).filter((l) => l.user_id !== user.id) });
+      setPost({ ...post, likes_count: Math.max(0, post.likes_count - 1), post_likes: (post.post_likes ?? []).filter((l) => l.user_id !== user.id) });
     } else {
       await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
       setPost({ ...post, likes_count: post.likes_count + 1, post_likes: [...(post.post_likes ?? []), { user_id: user.id }] });
@@ -151,7 +151,7 @@ export default function PostDetailScreen() {
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
             <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#e74c3c' : colors.nomad.onSurfaceVariant} />
-            <Text style={styles.actionText}>{post.likes_count} thích</Text>
+            <Text style={styles.actionText}>{post.post_likes?.length ?? post.likes_count} thích</Text>
           </TouchableOpacity>
           <View style={styles.actionBtn}>
             <Ionicons name="chatbubble-outline" size={19} color={colors.nomad.onSurfaceVariant} />
