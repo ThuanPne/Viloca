@@ -16,27 +16,50 @@ interface UseUserLocationResult {
   refresh: () => Promise<void>;
 }
 
+// Cache vị trí gần nhất trong bộ nhớ theo phiên app — các màn hình mở lại
+// sau đó (vd. mở địa điểm khác rồi vào lại Map) hiển thị ngay thay vì chờ
+// GPS fix mới, vốn có thể mất vài giây mỗi lần.
+let cachedLocation: UserLocation | null = null;
+
 export function useUserLocation(): UseUserLocationResult {
-  const [location, setLocation] = useState<UserLocation | null>(null);
+  const [location, setLocation] = useState<UserLocation | null>(cachedLocation);
   const [permissionStatus, setPermissionStatus] =
     useState<Location.PermissionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchLocation = useCallback(async () => {
-    setLoading(true);
+    setLoading(!cachedLocation);
     setError(null);
     try {
+      // Fast path: vị trí hệ điều hành đã biết gần nhất — gần như tức thì.
+      const last = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+      });
+      if (last) {
+        const loc = {
+          lat: last.coords.latitude,
+          lng: last.coords.longitude,
+          accuracy: last.coords.accuracy,
+        };
+        cachedLocation = loc;
+        setLocation(loc);
+        setLoading(false);
+      }
+
+      // Làm mới bằng vị trí chính xác hơn (chạy nền, không chặn UI nếu đã có fast path).
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      setLocation({
+      const loc = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
-      });
+      };
+      cachedLocation = loc;
+      setLocation(loc);
     } catch (err: any) {
-      setError(err?.message ?? 'Không lấy được vị trí');
+      if (!cachedLocation) setError(err?.message ?? 'Không lấy được vị trí');
     } finally {
       setLoading(false);
     }

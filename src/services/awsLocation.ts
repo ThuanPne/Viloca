@@ -14,8 +14,51 @@ const GEOCODE_URL = `https://places.geo.${REGION}.amazonaws.com/v2/geocode?key=$
  * MapLibre tự fetch URL này → lấy tile endpoints.
  * Style: Standard | Monochrome | Hybrid | Satellite
  */
-export function getMapStyleUrl(style = 'Standard'): string {
+export function getMapStyleUrl(style: MapStyleId = 'Standard'): string {
   return `https://maps.geo.${REGION}.amazonaws.com/v2/styles/${style}/descriptor?key=${API_KEY}`;
+}
+
+export type MapStyleId = 'Standard' | 'Monochrome' | 'Hybrid' | 'Satellite';
+
+export const MAP_STYLES: { id: MapStyleId; label: string; icon: string }[] = [
+  { id: 'Standard', label: 'Mặc định', icon: 'map-outline' },
+  { id: 'Satellite', label: 'Vệ tinh', icon: 'planet-outline' },
+  { id: 'Hybrid', label: 'Kết hợp', icon: 'layers-outline' },
+  { id: 'Monochrome', label: 'Đơn sắc', icon: 'contrast-outline' },
+];
+
+const styleCache = new Map<string, object>();
+const stylePromiseCache = new Map<string, Promise<object>>();
+
+/**
+ * Style descriptor JSON, cached trong bộ nhớ theo phiên app.
+ * Tránh việc mỗi lần vào màn Map phải gọi lại AWS để lấy style descriptor
+ * (nguồn gốc chính của cảm giác "load lại toàn bộ bản đồ" mỗi khi mở địa điểm mới).
+ */
+export async function getCachedMapStyle(style: MapStyleId = 'Standard'): Promise<object> {
+  const cached = styleCache.get(style);
+  if (cached) return cached;
+
+  const pending = stylePromiseCache.get(style);
+  if (pending) return pending;
+
+  const promise = fetch(getMapStyleUrl(style))
+    .then((res) => {
+      if (!res.ok) throw new Error(`Style descriptor error: ${res.status}`);
+      return res.json();
+    })
+    .then((json) => {
+      styleCache.set(style, json);
+      stylePromiseCache.delete(style);
+      return json;
+    })
+    .catch((err) => {
+      stylePromiseCache.delete(style);
+      throw err;
+    });
+
+  stylePromiseCache.set(style, promise);
+  return promise;
 }
 
 /**
