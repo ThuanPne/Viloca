@@ -163,6 +163,16 @@ else{
       });
   }
 }
+// Inject user location từ React Native sau khi GPS xong
+window.addUserLocation = function(lat, lng) {
+  if (window._userMarker) { window._userMarker.setLatLng([lat, lng]); return; }
+  var udIcon = L.divIcon({
+    html: '<div class="user-dot-wrap"><div class="user-pulse"><\/div><div class="user-dot"><\/div><\/div>',
+    className: '', iconSize: [20, 20], iconAnchor: [10, 10]
+  });
+  window._userMarker = L.marker([lat, lng], {icon: udIcon, zIndexOffset: -100})
+    .addTo(map).bindPopup('<b>Vị trí của bạn<\/b>');
+};
 <\/script>
 </body>
 </html>`;
@@ -604,10 +614,12 @@ export default function TripDetailScreen() {
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
 
   // Map modal
-  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapModalVisible, setMapModalVisible]   = useState(false);
   const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
-  const [mapDay, setMapDay] = useState(1);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapLocating, setMapLocating]           = useState(false);
+  const [mapDay, setMapDay]                     = useState(1);
+  const [userLocation, setUserLocation]         = useState<{ lat: number; lng: number } | null>(null);
+  const mapWebViewRef = useRef<any>(null);
 
 
   // Edit trip modal
@@ -742,6 +754,15 @@ export default function TripDetailScreen() {
   }
 
   // ── Add location ──────────────────────────────────────────────────────────────
+
+  // Inject user dot khi GPS xong (sau khi WebView đã sẵn sàng)
+  useEffect(() => {
+    if (userLocation && !mapWebViewLoading && mapWebViewRef.current) {
+      mapWebViewRef.current.injectJavaScript(
+        `if(typeof window.addUserLocation==='function'){window.addUserLocation(${userLocation.lat},${userLocation.lng});}; true;`
+      );
+    }
+  }, [userLocation, mapWebViewLoading]);
 
   // Refresh items khi quay về từ add-location page
   useFocusEffect(useCallback(() => {
@@ -887,18 +908,21 @@ export default function TripDetailScreen() {
   async function openMapWithLocation(day: number) {
     setMapDay(day);
     setMapWebViewLoading(true);
+    setUserLocation(null);
+    setMapModalVisible(true);   // mở modal NGAY, không chờ GPS
+
+    setMapLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      } else {
-        setUserLocation(null);
       }
     } catch {
-      setUserLocation(null);
+      // GPS thất bại, map vẫn hiển thị bình thường không có user dot
+    } finally {
+      setMapLocating(false);
     }
-    setMapModalVisible(true);
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────────
@@ -1412,9 +1436,18 @@ export default function TripDetailScreen() {
             </ScrollView>
           )}
 
+          {/* GPS locating indicator */}
+          {mapLocating && (
+            <View style={styles.mapLocatingBar}>
+              <ActivityIndicator size="small" color={colors.nomad.primary} />
+              <Text style={styles.mapLocatingText}>Đang xác định vị trí...</Text>
+            </View>
+          )}
+
           {/* Map */}
           <View style={{ flex: 1 }}>
             <WebView
+              ref={mapWebViewRef}
               key={mapDay}
               source={{ html: buildLeafletHtml(
                 (itemsByDay[mapDay] ?? [])
@@ -1426,7 +1459,7 @@ export default function TripDetailScreen() {
                     }
                     return acc;
                   }, []),
-                userLocation,
+                null,   // luôn null — user dot được inject sau qua JS
               )}}
               onLoad={() => setMapWebViewLoading(false)}
               style={{ flex: 1 }}
@@ -1436,6 +1469,7 @@ export default function TripDetailScreen() {
             {mapWebViewLoading && (
               <View style={styles.mapLoadingOverlay}>
                 <ActivityIndicator size="large" color={colors.nomad.primary} />
+                <Text style={styles.mapLoadingText}>Đang tải bản đồ...</Text>
               </View>
             )}
           </View>
@@ -1935,8 +1969,15 @@ const styles = StyleSheet.create({
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.bgCard,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', gap: 12,
   },
+  mapLoadingText: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
+  mapLocatingBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: spacing.lg, paddingVertical: 8,
+    backgroundColor: '#e8f0d8', borderBottomWidth: 1, borderBottomColor: colors.nomad.primary + '30',
+  },
+  mapLocatingText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '500' },
   mapModalFooter: {
     paddingHorizontal: spacing.lg, paddingVertical: 12,
     borderTopWidth: 1, borderTopColor: colors.border,
