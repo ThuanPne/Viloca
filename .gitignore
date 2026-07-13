@@ -26,3 +26,11 @@ assets/viloca_credentials.csv
 Locations_data/
 Screenshot/
 stitch_hidden_gem_travel_app/
+
+# Build outputs / native
+android/
+ios/
+
+# Accidental copies / tooling
+Viloca/
+OpenJDK*/
