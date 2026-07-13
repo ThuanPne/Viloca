@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  TextInput, ActivityIndicator, ScrollView, SafeAreaView, Modal,
+  TextInput, ActivityIndicator, ScrollView, SafeAreaView, Modal, Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DatePicker } from '@/src/components/ui/DatePicker';
@@ -10,6 +11,7 @@ import { Button } from '@/src/components/ui/Button';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
 import supabase from '@/src/lib/supabase';
+import { getCoverForDestination, DESTINATION_COVERS } from '@/src/lib/destination-covers';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,39 +48,8 @@ const BUDGETS: { label: string; sublabel: string; value: number }[] = [
   { label: '1.5M+/ngày',     sublabel: 'Cao cấp',    value: 2000000 },
 ];
 
-// City → representative cover image seed (picsum)
-const CITY_COVER_SEEDS: Record<string, string> = {
-  'Hà Nội':         'hanoi-city',
-  'TP. Hồ Chí Minh':'saigon-city',
-  'Đà Nẵng':        'danang-beach',
-  'Hội An':         'hoian-lanterns',
-  'Quảng Nam':      'quangnam-ancient',
-  'Nha Trang':      'nhatrang-sea',
-  'Khánh Hòa':      'khanhhoa-coast',
-  'Đà Lạt':         'dalat-flower',
-  'Lâm Đồng':       'lamdong-pine',
-  'Huế':            'hue-imperial',
-  'Thừa Thiên Huế': 'hue-citadel',
-  'Hạ Long':        'halong-bay',
-  'Quảng Ninh':     'quangninh-bay',
-  'Sapa':           'sapa-terraces',
-  'Lào Cai':        'laocai-mountain',
-  'Hà Giang':       'hagiang-plateau',
-  'Ninh Bình':      'ninhbinh-caves',
-  'Phú Quốc':       'phuquoc-island',
-  'Kiên Giang':     'kiengiang-sea',
-  'Cần Thơ':        'cantho-river',
-  'Hải Phòng':      'haiphong-port',
-  'Mũi Né':         'muine-dunes',
-  'Bình Thuận':     'binhthuan-sand',
-  'Phú Yên':        'phuyen-yellow',
-  'Quy Nhơn':       'quinhon-coast',
-  'Bình Định':      'binhdinh-sea',
-};
-
 function getCoverImage(destination: string): string {
-  const seed = CITY_COVER_SEEDS[destination] ?? `vn-${destination.toLowerCase().replace(/\s+/g, '-')}`;
-  return `https://picsum.photos/seed/${seed}/800/400`;
+  return getCoverForDestination(destination, destination);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -376,6 +347,24 @@ export default function CreateTripScreen() {
               </Text>
               <Ionicons name="chevron-down" size={16} color={N.onSurfaceVariant} />
             </TouchableOpacity>
+
+            {!!destination && !!DESTINATION_COVERS[destination] && (
+              <View style={styles.coverPreview}>
+                <Image
+                  source={{ uri: getCoverImage(destination) }}
+                  style={styles.coverPreviewImg}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.6)']}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.coverPreviewLabel}>
+                  <Ionicons name="image-outline" size={12} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.coverPreviewText}>Ảnh bìa chuyến đi</Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -726,6 +715,11 @@ const styles = StyleSheet.create({
   destPicker:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   destPickerText: { fontSize: 15, color: N.onSurface, flex: 1 },
   destPickerPlaceholder: { fontSize: 15, color: N.onSurfaceVariant, flex: 1 },
+
+  coverPreview:      { marginTop: spacing.md, height: 160, borderRadius: radius.lg, overflow: 'hidden' },
+  coverPreviewImg:   { width: '100%', height: '100%' },
+  coverPreviewLabel: { position: 'absolute', bottom: 10, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  coverPreviewText:  { fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
 
   selectBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectBtnOpen:  { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
