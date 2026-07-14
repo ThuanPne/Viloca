@@ -784,9 +784,46 @@ export default function TripDetailScreen() {
   }
 
   async function updateItemSlot(itemId: string, newSlot: TimeSlot) {
-    setItems(prev => prev.map(i => i.id === itemId ? { ...i, time_slot: newSlot } : i));
-    setSelectedItem(prev => prev?.id === itemId ? { ...prev, time_slot: newSlot } : prev);
-    await supabase.from('trip_items').update({ time_slot: newSlot }).eq('id', itemId);
+    const SLOT_ORDER: Record<TimeSlot, number> = { morning: 0, afternoon: 1, evening: 2 };
+
+    setItems(prev => {
+      // Apply new slot to the target item
+      const updated = prev.map(i => i.id === itemId ? { ...i, time_slot: newSlot } : i);
+
+      // Find which day this item belongs to
+      const dayNum = updated.find(i => i.id === itemId)?.day_number;
+      if (dayNum == null) return updated;
+
+      // Re-sort that day's items by slot order, preserving relative order within same slot
+      const otherDays = updated.filter(i => i.day_number !== dayNum);
+      const dayItems = updated
+        .filter(i => i.day_number === dayNum)
+        .sort((a, b) => SLOT_ORDER[a.time_slot] - SLOT_ORDER[b.time_slot] || a.sort_order - b.sort_order);
+
+      // Reassign sort_order + recalculate visit_time for items without manual time
+      const slotCounts: Record<string, number> = {};
+      const reordered = dayItems.map((item, idx) => {
+        const slotIdx = slotCounts[item.time_slot] ?? 0;
+        slotCounts[item.time_slot] = slotIdx + 1;
+        return {
+          ...item,
+          sort_order: idx,
+          visit_time: item.visit_time ? item.visit_time : suggestTime(item.time_slot, slotIdx),
+        };
+      });
+
+      // Persist all changed items in background
+      void Promise.all(reordered.map(item =>
+        supabase.from('trip_items').update({ sort_order: item.sort_order, time_slot: item.time_slot, visit_time: item.visit_time }).eq('id', item.id)
+      ));
+
+      setSelectedItem(prev => {
+        if (!prev || prev.id !== itemId) return prev;
+        return reordered.find(i => i.id === itemId) ?? prev;
+      });
+
+      return [...otherDays, ...reordered].sort((a, b) => a.day_number - b.day_number || a.sort_order - b.sort_order);
+    });
   }
 
   // ── Reorder (drag-and-drop) ───────────────────────────────────────────────────
@@ -1231,7 +1268,7 @@ export default function TripDetailScreen() {
                       onReorder={(newItems) => handleDragEnd(selectedDay, newItems)}
                       onItemPress={(item) => {
                         if (editMode) {
-                          setCheckedIds(prev => { const n = new Set(prev); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n; });
+                          setSelectedItem(item);
                         } else {
                           if (item.location_id) router.push(`/location/${item.location_id}`);
                           else if (item.experience_id) router.push(`/experience/${item.experience_id}`);

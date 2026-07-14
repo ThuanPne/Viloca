@@ -19,7 +19,7 @@ const TIMES = [
   '18:00','19:00','20:00','21:00',
 ];
 
-type SlimItem = { day_number: number; visit_time: string | null; location_id: string | null; sort_order: number };
+type SlimItem = { id: string; day_number: number; visit_time: string | null; location_id: string | null; sort_order: number };
 
 function cityLabel(code: string | null) {
   if (code === 'SG') return 'TP. HCM';
@@ -48,7 +48,7 @@ export default function AddLocationScreen() {
     if (!trip_id) return;
     Promise.all([
       supabase.from('trips').select('start_date, end_date').eq('id', trip_id).single(),
-      supabase.from('trip_items').select('day_number, visit_time, location_id, sort_order').eq('trip_id', trip_id),
+      supabase.from('trip_items').select('id, day_number, visit_time, location_id, sort_order').eq('trip_id', trip_id),
     ]).then(([t, i]) => {
       const items = (i.data ?? []) as SlimItem[];
       setTripItems(items);
@@ -73,7 +73,7 @@ export default function AddLocationScreen() {
     const timeSlot: TimeSlot = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
     const maxOrder = tripItems.filter(i => i.day_number === selectedDay).length;
 
-    const { error: err } = await supabase.from('trip_items').insert({
+    const { data: inserted, error: err } = await supabase.from('trip_items').insert({
       trip_id,
       location_id: location.id,
       day_number:  selectedDay,
@@ -81,9 +81,19 @@ export default function AddLocationScreen() {
       visit_time:  selectedTime,
       note:        null,
       sort_order:  maxOrder,
-    });
+    }).select('id').single();
     setAdding(false);
-    if (err) { setError('Không thể thêm: ' + err.message); return; }
+    if (err || !inserted) { setError('Không thể thêm: ' + (err?.message ?? 'unknown')); return; }
+
+    // Re-sort toàn bộ items trong ngày theo visit_time để đảm bảo thứ tự đúng
+    const allDay = [
+      ...tripItems.filter(i => i.day_number === selectedDay),
+      { id: inserted.id, visit_time: selectedTime, day_number: selectedDay, location_id: location.id, sort_order: maxOrder },
+    ].sort((a, b) => (a.visit_time ?? '00:00').localeCompare(b.visit_time ?? '00:00'));
+    await Promise.all(allDay.map((item, idx) =>
+      supabase.from('trip_items').update({ sort_order: idx }).eq('id', item.id)
+    ));
+
     router.dismiss(2); // quay về trip page (bỏ qua search)
   }
 
