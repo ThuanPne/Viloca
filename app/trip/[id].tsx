@@ -783,6 +783,12 @@ export default function TripDetailScreen() {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
   }
 
+  async function updateItemSlot(itemId: string, newSlot: TimeSlot) {
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, time_slot: newSlot } : i));
+    setSelectedItem(prev => prev?.id === itemId ? { ...prev, time_slot: newSlot } : prev);
+    await supabase.from('trip_items').update({ time_slot: newSlot }).eq('id', itemId);
+  }
+
   // ── Reorder (drag-and-drop) ───────────────────────────────────────────────────
 
   async function handleDragEnd(dayNum: number, newOrder: TripItem[]) {
@@ -1526,10 +1532,24 @@ export default function TripDetailScreen() {
                     )}
                     <View style={styles.detailRow}>
                       <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
-                      <Text style={styles.detailRowText}>
-                        Ngày {selectedItem.day_number} · {slot?.icon} {slot?.label}
-                        {selectedItem.visit_time ? ` · ${selectedItem.visit_time.slice(0, 5)}` : ''}
-                      </Text>
+                      <Text style={styles.detailRowText}>Ngày {selectedItem.day_number}</Text>
+                    </View>
+                    <View style={styles.slotEditRow}>
+                      <Text style={styles.slotEditLabel}>Buổi</Text>
+                      <View style={styles.slotChips}>
+                        {TIME_SLOTS.map(s => (
+                          <TouchableOpacity
+                            key={s.value}
+                            style={[styles.slotChip, selectedItem.time_slot === s.value && styles.slotChipActive]}
+                            onPress={() => updateItemSlot(selectedItem.id, s.value)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.slotChipText, selectedItem.time_slot === s.value && styles.slotChipTextActive]}>
+                              {s.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                     {!!(loc?.rating || loc?.duration_minutes || loc?.price_per_person) && (
                       <View style={[styles.detailRow, { flexWrap: 'wrap', gap: 12 }]}>
@@ -1935,6 +1955,13 @@ const styles = StyleSheet.create({
   detailNoteBox:         { backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border },
   detailNoteLabel:       { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginBottom: 4 },
   detailNoteText:        { fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
+  slotEditRow:           { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: spacing.sm },
+  slotEditLabel:         { fontSize: 13, fontWeight: '600', color: colors.textMuted, width: 36 },
+  slotChips:             { flexDirection: 'row', gap: 8 },
+  slotChip:              { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bgCard },
+  slotChipActive:        { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  slotChipText:          { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  slotChipTextActive:    { color: colors.nomad.primary },
   detailActions:         { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
   detailDeleteBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.error, paddingVertical: 12, borderRadius: radius.lg },
   detailDeleteText:      { fontSize: 13, fontWeight: '600', color: colors.error },
