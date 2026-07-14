@@ -28,29 +28,34 @@ const PROVINCES = [
   'Vĩnh Long','Vĩnh Phúc','Yên Bái',
 ];
 
-const VIBES = ['Bình yên', 'Cổ kính', 'Hoang sơ', 'Ẩm thực', 'Mạo hiểm', 'Văn hóa'];
+const PRESET_VIBES = ['Bình yên', 'Cổ kính', 'Hoang sơ', 'Ẩm thực'];
+
+const FIXED_GROUP_SIZE: Record<string, number> = { solo: 1, couple: 2 };
 
 const TRAVELING_WITH: { label: string; value: string }[] = [
-  { label: 'Solo', value: 'solo' },
-  { label: 'Cặp đôi', value: 'couple' },
-  { label: 'Gia đình', value: 'family' },
-  { label: 'Nhóm bạn', value: 'friends' },
+  { label: '🧍 Solo',        value: 'solo' },
+  { label: '💑 Cặp đôi',    value: 'couple' },
+  { label: '👨‍👩‍👧 Gia đình', value: 'family' },
+  { label: '👫 Nhóm bạn',   value: 'friends' },
 ];
 
-const ACCOMMODATIONS = ['Homestay', 'Khách sạn', 'Camping'];
+const ACCOMMODATIONS = ['Homestay', 'Khách sạn', 'Camping', 'Resort'];
 const TRANSPORTS     = ['Xe máy', 'Thuê ô tô', 'Xe khách'];
 const ACTIVITY_LEVELS = ['Thư giãn', 'Vừa phải', 'Năng động'];
 
 const BUDGETS: { label: string; sublabel: string; value: number }[] = [
-  { label: '< 300k/ngày',    sublabel: 'Tiết kiệm',  value: 300000 },
-  { label: '300k–700k/ngày', sublabel: 'Trung bình', value: 500000 },
-  { label: '700k–1.5M/ngày', sublabel: 'Thoải mái',  value: 1000000 },
-  { label: '1.5M+/ngày',     sublabel: 'Cao cấp',    value: 2000000 },
+  { label: 'Tiết kiệm',  sublabel: '< 300k/ngày',    value: 300000 },
+  { label: 'Trung bình', sublabel: '300–700k/ngày',  value: 500000 },
+  { label: 'Thoải mái',  sublabel: '700k–1.5M/ngày', value: 1000000 },
+  { label: 'Sang trọng', sublabel: '> 1.5M/ngày',    value: 2000000 },
 ];
 
-function getCoverImage(destination: string): string {
-  return getCoverForDestination(destination, destination);
-}
+const AI_LOG_STEPS = [
+  'Đang tìm kiếm địa điểm...',
+  'Tối ưu hóa lộ trình di chuyển...',
+  'Đang chọn lọc địa điểm ăn uống...',
+  'Hoàn thiện chi tiết chuyến đi...',
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,12 +63,11 @@ function stripDiacritics(str: string) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, (c) => c === 'đ' ? 'd' : 'D');
 }
 
-function formatVND(amount: number): string {
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}M đ`;
-  return `${(amount / 1_000).toFixed(0)}k đ`;
+function getCoverImage(destination: string): string {
+  return getCoverForDestination(destination, destination);
 }
 
-type Step = 1 | 2 | '3a' | '3b';
+type Step = 1 | 'ai' | 'manual';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -77,48 +81,67 @@ export default function CreateTripScreen() {
   const abortRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Step 1
-  const [title, setTitle]                       = useState('');
-  const [destination, setDestination]           = useState('');
+  const [title, setTitle]                           = useState('');
+  const [destination, setDestination]               = useState('');
   const [showProvincePicker, setShowProvincePicker] = useState(false);
-  const [provinceSearch, setProvinceSearch]     = useState('');
+  const [provinceSearch, setProvinceSearch]         = useState('');
 
-  // Step 3b
+  // Step manual
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate]     = useState('');
 
-  // Step 3a
-  const [travelingWith, setTravelingWith]   = useState('');
-  const [vibes, setVibes]                   = useState<string[]>([]);
-  const [groupSize, setGroupSize]           = useState(2);
-  const [hasChildren, setHasChildren]       = useState(false);
-  const [days, setDays]                     = useState(3);
-  const [budget, setBudget]                 = useState<number | null>(null);
-  const [accommodation, setAccommodation]   = useState('');
-  const [transport, setTransport]           = useState('');
-  const [activityLevel, setActivityLevel]   = useState('');
-  const [openDropdown, setOpenDropdown]     = useState<string | null>(null);
+  // Step ai
+  const [travelingWith, setTravelingWith] = useState('');
+  const [vibes, setVibes]                 = useState<string[]>([]);
+  const [groupSize, setGroupSize]         = useState(2);
+  const [days, setDays]                   = useState(3);
+  const [budget, setBudget]               = useState<number | null>(null);
+  const [accommodation, setAccommodation] = useState('');
+  const [transport, setTransport]         = useState('');
+  const [activityLevel, setActivityLevel] = useState('');
+  const [vibeInput, setVibeInput]         = useState('');
+  const [showVibeInput, setShowVibeInput] = useState(false);
 
   function goBack() {
     if (step === 1) router.back();
-    else if (step === 2) setStep(1);
-    else setStep(2);
+    else setStep(1);
     setError('');
   }
 
-  function goStep2() {
-    if (!title.trim()) { setError('Vui lòng nhập tên chuyến đi'); return; }
-    if (!destination)  { setError('Vui lòng chọn điểm đến'); return; }
+  function validateStep1(): boolean {
+    if (!title.trim()) { setError('Vui lòng nhập tên chuyến đi'); return false; }
+    if (!destination)  { setError('Vui lòng chọn điểm đến'); return false; }
     setError('');
-    setStep(2);
+    return true;
   }
+
+  function goAI()     { if (validateStep1()) setStep('ai'); }
+  function goManual() { if (validateStep1()) setStep('manual'); }
 
   function toggleVibe(v: string) {
     setVibes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
   }
 
-  function toggleDropdown(field: string) {
-    setOpenDropdown(prev => prev === field ? null : field);
+  function addCustomVibe() {
+    const v = vibeInput.trim();
+    if (!v || vibes.includes(v)) { setVibeInput(''); setShowVibeInput(false); return; }
+    setVibes(prev => [...prev, v]);
+    setVibeInput('');
+    setShowVibeInput(false);
   }
+
+  function removeVibe(v: string) {
+    setVibes(prev => prev.filter(x => x !== v));
+  }
+
+  function selectTravelingWith(val: string) {
+    const next = travelingWith === val ? '' : val;
+    setTravelingWith(next);
+    if (FIXED_GROUP_SIZE[next] !== undefined) setGroupSize(FIXED_GROUP_SIZE[next]);
+  }
+
+  const showGroupSizePicker = !FIXED_GROUP_SIZE[travelingWith];
+  const customVibes = vibes.filter(v => !PRESET_VIBES.includes(v));
 
   async function createManual() {
     if (saving) return;
@@ -157,7 +180,6 @@ export default function CreateTripScreen() {
     log('Đang tạo chuyến đi...');
     const summaryParts = [
       travelingWith ? `Đi cùng: ${TRAVELING_WITH.find(x => x.value === travelingWith)?.label}` : null,
-      hasChildren   ? 'Có trẻ em / người lớn tuổi' : null,
       accommodation ? `Lưu trú: ${accommodation}` : null,
       transport     ? `Di chuyển: ${transport}` : null,
       activityLevel ? `Mức độ: ${activityLevel}` : null,
@@ -176,7 +198,6 @@ export default function CreateTripScreen() {
 
     log(`Đang gửi yêu cầu tới AI (${days} ngày, ${vibes.join(', ')})...`);
 
-    // AI call with 45s timeout
     let timedOut = false;
     const timeoutId = setTimeout(() => { timedOut = true; }, 45000);
     abortRef.current = timeoutId;
@@ -247,69 +268,86 @@ export default function CreateTripScreen() {
     if (abortRef.current) clearTimeout(abortRef.current);
   }
 
-  // ── Full-screen AI loading ──
+  // ── AI Loading screen ──
   if (aiGenerating) {
+    const okCount = aiLogs.filter(l => l.type === 'ok').length;
+    const hasErr  = aiLogs.some(l => l.type === 'err');
+
+    function stepState(i: number): 'done' | 'active' | 'error' | 'pending' {
+      if (hasErr && i === okCount) return 'error';
+      if (i < okCount) return 'done';
+      if (i === okCount) return 'active';
+      return 'pending';
+    }
+
     return (
       <SafeAreaView style={styles.loadingScreen}>
+        <View style={styles.loadingProgress}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={[styles.loadingProgressBar, i === 0 && styles.loadingProgressBarFilled]} />
+          ))}
+        </View>
+
         <View style={styles.loadingContent}>
           <View style={styles.loadingIconWrap}>
-            <Ionicons name="sparkles" size={52} color={N.primary} />
+            <Ionicons name="sparkles" size={48} color={N.primary} />
           </View>
           <Text style={styles.loadingTitle}>AI đang tạo lịch trình</Text>
           <Text style={styles.loadingSubtitle}>{title} · {destination} · {days} ngày</Text>
           <ActivityIndicator size="small" color={N.primary} style={{ marginTop: spacing.lg }} />
-          {aiLogs.length > 0 && (
-            <View style={styles.logBox}>
-              {aiLogs.map((entry, i) => (
+
+          <View style={styles.logBox}>
+            {AI_LOG_STEPS.map((msg, i) => {
+              const state = stepState(i);
+              return (
                 <View key={i} style={styles.logRow}>
-                  <Ionicons
-                    name={entry.type === 'ok' ? 'checkmark-circle' : entry.type === 'err' ? 'close-circle' : entry.type === 'warn' ? 'warning-outline' : 'ellipse-outline'}
-                    size={14}
-                    color={entry.type === 'ok' ? N.secondary : entry.type === 'err' ? colors.error : entry.type === 'warn' ? '#F59E0B' : N.primary}
-                  />
-                  <Text style={[styles.logLine, entry.type === 'err' && { color: colors.error }]}>{entry.msg}</Text>
+                  {state === 'done'    && <Ionicons name="checkmark-circle" size={18} color={N.primary} />}
+                  {state === 'active'  && <ActivityIndicator size="small" color={N.primary} style={{ width: 18, height: 18 }} />}
+                  {state === 'pending' && <Ionicons name="radio-button-off" size={18} color={N.onSurfaceVariant} />}
+                  {state === 'error'   && <Ionicons name="close-circle" size={18} color={colors.error} />}
+                  <Text style={[
+                    styles.logLine,
+                    state === 'done'    && { color: N.secondary },
+                    state === 'pending' && { color: N.onSurfaceVariant, opacity: 0.4 },
+                    state === 'error'   && { color: colors.error },
+                  ]}>{msg}</Text>
                 </View>
-              ))}
-            </View>
-          )}
-          <TouchableOpacity style={styles.cancelBtn} onPress={cancelAI}>
-            <Text style={styles.cancelBtnText}>Huỷ</Text>
-          </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
+
+        <TouchableOpacity style={styles.cancelBtn} onPress={cancelAI}>
+          <Text style={styles.cancelBtnText}>Huỷ</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
-  const stepNumber = step === 1 ? 1 : step === 2 ? 2 : 3;
-  const stepTitle  = step === 1 ? 'Chuyến đi mới' : step === 2 ? 'Chọn cách tạo' : step === '3a' ? 'Thiết lập AI' : 'Chọn ngày đi';
+  const headerTitle  = step === 'ai' ? 'Thiết lập sở thích' : step === 'manual' ? 'Chọn ngày đi' : 'Tạo chuyến đi';
+  const progressStep = step === 1 ? 1 : 2;
+  const hasCover     = !!destination && !!DESTINATION_COVERS[destination];
+  const coverUri     = destination ? getCoverImage(destination) : null;
 
   return (
     <SafeAreaView style={styles.screen}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBack} onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={22} color={N.onSurface} />
+          <Ionicons name="arrow-back" size={22} color={N.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{stepTitle}</Text>
+        <Text style={styles.headerTitle}>{headerTitle}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Step indicator */}
-      <View style={styles.stepRow}>
-        {[1, 2, 3].map((s) => {
-          const active = s === stepNumber;
-          const done   = s < stepNumber;
-          return (
-            <View key={s} style={styles.stepItem}>
-              <View style={[styles.stepDot, active && styles.stepDotActive, done && styles.stepDotDone]}>
-                {done
-                  ? <Ionicons name="checkmark" size={10} color="#fff" />
-                  : <Text style={[styles.stepNum, active && { color: '#fff' }]}>{s}</Text>}
-              </View>
-              {s < 3 && <View style={[styles.stepLine, done && styles.stepLineDone]} />}
-            </View>
-          );
-        })}
+      {/* Progress bar */}
+      <View style={styles.progressRow}>
+        {[1, 2, 3].map((s) => (
+          <View key={s} style={styles.progressItem}>
+            <View style={[styles.progressBar, s <= progressStep && styles.progressBarFilled]} />
+            <View style={[styles.progressDot, s <= progressStep && styles.progressDotFilled]} />
+          </View>
+        ))}
       </View>
 
       {error ? (
@@ -322,314 +360,269 @@ export default function CreateTripScreen() {
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
       >
         {/* ── STEP 1 ── */}
         {step === 1 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.inputLabel}>Tên chuyến đi *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="VD: Hội An cuối tuần"
-              placeholderTextColor={N.onSurfaceVariant}
-              value={title}
-              onChangeText={setTitle}
-            />
-
-            <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Điểm đến *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.destPicker]}
-              onPress={() => { setProvinceSearch(''); setShowProvincePicker(true); }}
-            >
-              <Text style={destination ? styles.destPickerText : styles.destPickerPlaceholder}>
-                {destination || 'Chọn tỉnh / thành phố...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-
-            {!!destination && !!DESTINATION_COVERS[destination] && (
-              <View style={styles.coverPreview}>
-                <Image
-                  source={{ uri: getCoverImage(destination) }}
-                  style={styles.coverPreviewImg}
-                  resizeMode="cover"
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.6)']}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.coverPreviewLabel}>
-                  <Ionicons name="image-outline" size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.coverPreviewText}>Ảnh bìa chuyến đi</Text>
+          <View>
+            {/* Hero cover */}
+            <View style={styles.hero}>
+              {hasCover ? (
+                <>
+                  <Image source={{ uri: coverUri! }} style={styles.heroImg} resizeMode="cover" />
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={StyleSheet.absoluteFillObject} />
+                  <View style={styles.heroCityWrap}>
+                    <Text style={styles.heroCity}>{destination}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.heroPlaceholder}>
+                  <Ionicons name="location-outline" size={36} color={N.primary + '80'} />
+                  <Text style={styles.heroPlaceholderText}>Chọn điểm đến</Text>
                 </View>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ── STEP 2 ── */}
-        {step === 2 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.sectionLabel}>Chọn cách tạo lịch trình</Text>
-
-            <TouchableOpacity style={styles.methodCard} onPress={() => { setError(''); setStep('3a'); }} activeOpacity={0.85}>
-              <View style={styles.methodIcon}>
-                <Ionicons name="sparkles" size={28} color={N.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.methodTitle}>Tạo bằng AI</Text>
-                <Text style={styles.methodDesc}>AI gợi ý lịch trình theo phong cách và ngân sách của bạn</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.methodCard} onPress={() => { setError(''); setStep('3b'); }} activeOpacity={0.85}>
-              <View style={[styles.methodIcon, { backgroundColor: N.secondaryContainer }]}>
-                <Ionicons name="pencil-outline" size={28} color={N.secondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.methodTitle}>Tạo thủ công</Text>
-                <Text style={styles.methodDesc}>Tự thêm địa điểm và sắp xếp theo ý muốn</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── STEP 3a — AI params ── */}
-        {step === '3a' && (
-          <View style={styles.stepContent}>
-
-            {/* Đi cùng ai */}
-            <Text style={styles.inputLabel}>Đi cùng ai?</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'travelingWith' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('travelingWith')}
-            >
-              <Text style={travelingWith ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                {TRAVELING_WITH.find(x => x.value === travelingWith)?.label || 'Chọn hình thức đi...'}
-              </Text>
-              <Ionicons name={openDropdown === 'travelingWith' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'travelingWith' && (
-              <View style={styles.dropdownList}>
-                {TRAVELING_WITH.map((opt, i) => {
-                  const active = travelingWith === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
-                      onPress={() => { setTravelingWith(active ? '' : opt.value); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{opt.label}</Text>
-                      {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Phong cách */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Phong cách chuyến đi *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'vibes' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('vibes')}
-            >
-              <Text style={vibes.length ? styles.selectBtnText : styles.selectBtnPlaceholder} numberOfLines={1}>
-                {vibes.length ? vibes.join(', ') : 'Chọn phong cách...'}
-              </Text>
-              <Ionicons name={openDropdown === 'vibes' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'vibes' && (
-              <View style={[styles.dropdownList, { padding: spacing.sm }]}>
-                <View style={styles.chipRow}>
-                  {VIBES.map((v) => (
-                    <TouchableOpacity key={v} style={[styles.chip, vibes.includes(v) && styles.chipActive]} onPress={() => toggleVibe(v)}>
-                      <Text style={[styles.chipText, vibes.includes(v) && styles.chipTextActive]}>{v}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Số người */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số người</Text>
-            <View style={styles.stepper}>
-              <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.max(1, groupSize - 1))}>
-                <Ionicons name="remove" size={20} color={N.onSurface} />
-              </TouchableOpacity>
-              <Text style={styles.stepperVal}>{groupSize}</Text>
-              <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.min(20, groupSize + 1))}>
-                <Ionicons name="add" size={20} color={N.onSurface} />
-              </TouchableOpacity>
+              )}
             </View>
 
-            <TouchableOpacity style={styles.checkRow} onPress={() => setHasChildren(!hasChildren)}>
-              <View style={[styles.checkbox, hasChildren && styles.checkboxChecked]}>
-                {hasChildren && <Ionicons name="checkmark" size={12} color="#fff" />}
-              </View>
-              <Text style={styles.checkLabel}>Có trẻ em hoặc người lớn tuổi</Text>
-            </TouchableOpacity>
+            <View style={styles.formSection}>
+              <Text style={styles.inputLabel}>Điểm đến</Text>
+              <TouchableOpacity
+                style={styles.pickerRow}
+                onPress={() => { setProvinceSearch(''); setShowProvincePicker(true); }}
+                activeOpacity={0.75}
+              >
+                <Text style={destination ? styles.pickerRowText : styles.pickerRowPlaceholder}>
+                  {destination || 'Chọn tỉnh / thành phố...'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={N.onSurfaceVariant} />
+              </TouchableOpacity>
 
-            {/* Số ngày */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Số ngày</Text>
-            <View style={styles.stepper}>
-              <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.max(1, days - 1))}>
-                <Ionicons name="remove" size={20} color={N.onSurface} />
-              </TouchableOpacity>
-              <Text style={styles.stepperVal}>{days} ngày</Text>
-              <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.min(14, days + 1))}>
-                <Ionicons name="add" size={20} color={N.onSurface} />
-              </TouchableOpacity>
+              <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Tên chuyến đi</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="VD: Hội An cuối tuần"
+                placeholderTextColor={N.onSurfaceVariant}
+                value={title}
+                onChangeText={setTitle}
+              />
+              <Text style={styles.inputHint}>Sử dụng tên dễ nhớ để tìm lại sau này.</Text>
+
+              {!!destination && (
+                <View style={styles.tipCard}>
+                  <Ionicons name="information-circle-outline" size={18} color={N.secondary} />
+                  <Text style={styles.tipText}>
+                    {destination} là điểm đến được yêu thích trên Viloca. Bạn đã sẵn sàng khám phá chưa?
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── STEP AI ── */}
+        {step === 'ai' && (
+          <View style={styles.formSection}>
+
+            {/* Đi cùng ai */}
+            <Text style={styles.sectionTitle}>Đi cùng ai?</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+              {TRAVELING_WITH.map((opt) => {
+                const active = travelingWith === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.pillChip, active && styles.pillChipActive]}
+                    onPress={() => selectTravelingWith(opt.value)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Phong cách */}
+            <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>Phong cách chuyến đi *</Text>
+            <View style={styles.chipWrap}>
+              {PRESET_VIBES.map((v) => {
+                const active = vibes.includes(v);
+                return (
+                  <TouchableOpacity key={v} style={[styles.pillChip, active && styles.pillChipActive]} onPress={() => toggleVibe(v)} activeOpacity={0.75}>
+                    <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>{v}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {customVibes.map((v) => (
+                <TouchableOpacity key={v} style={[styles.pillChip, styles.pillChipCustom]} onPress={() => removeVibe(v)} activeOpacity={0.75}>
+                  <Text style={styles.pillChipTextCustom}>{v}</Text>
+                  <Ionicons name="close" size={13} color={N.primary} style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+              ))}
+              {!showVibeInput && (
+                <TouchableOpacity style={styles.pillChipAdd} onPress={() => setShowVibeInput(true)} activeOpacity={0.75}>
+                  <Ionicons name="add" size={15} color={N.onSurfaceVariant} />
+                  <Text style={styles.pillChipAddText}>Thêm</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {showVibeInput && (
+              <View style={styles.vibeInputRow}>
+                <TextInput
+                  style={styles.vibeInput}
+                  placeholder="VD: Thể thao, Chụp ảnh..."
+                  placeholderTextColor={N.onSurfaceVariant}
+                  value={vibeInput}
+                  onChangeText={setVibeInput}
+                  maxLength={30}
+                  autoFocus
+                  onSubmitEditing={addCustomVibe}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity style={styles.vibeInputBtn} onPress={addCustomVibe}>
+                  <Text style={styles.vibeInputBtnText}>Thêm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.vibeInputCancel} onPress={() => { setShowVibeInput(false); setVibeInput(''); }}>
+                  <Ionicons name="close" size={18} color={N.onSurfaceVariant} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Số người + Số ngày */}
+            <View style={[styles.stepperRow, { marginTop: spacing.xl }]}>
+              {showGroupSizePicker && (
+                <View style={styles.stepperCard}>
+                  <Text style={styles.stepperCardLabel}>Số người</Text>
+                  <View style={styles.stepperControls}>
+                    <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.max(1, groupSize - 1))}>
+                      <Text style={styles.stepperBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.stepperVal}>{groupSize}</Text>
+                    <TouchableOpacity style={styles.stepperBtn} onPress={() => setGroupSize(Math.min(20, groupSize + 1))}>
+                      <Text style={styles.stepperBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              <View style={[styles.stepperCard, !showGroupSizePicker && { flex: 1 }]}>
+                <Text style={styles.stepperCardLabel}>Số ngày</Text>
+                <View style={styles.stepperControls}>
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.max(1, days - 1))}>
+                    <Text style={styles.stepperBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperVal}>{days}</Text>
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setDays(Math.min(14, days + 1))}>
+                    <Text style={styles.stepperBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
 
             {/* Ngân sách */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Ngân sách / người / ngày *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'budget' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('budget')}
-            >
-              <Text style={budget ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                {BUDGETS.find(b => b.value === budget)?.label || 'Chọn mức ngân sách...'}
-              </Text>
-              <Ionicons name={openDropdown === 'budget' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'budget' && (
-              <View style={styles.dropdownList}>
-                {BUDGETS.map((b, i) => {
-                  const active = budget === b.value;
-                  return (
-                    <TouchableOpacity
-                      key={b.value}
-                      style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]}
-                      onPress={() => { setBudget(b.value); setOpenDropdown(null); }}
-                    >
-                      <View>
-                        <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{b.sublabel}</Text>
-                        <Text style={styles.dropdownItemSub}>{b.label}</Text>
-                      </View>
-                      {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-            {budget !== null && openDropdown !== 'budget' && (
-              <View style={styles.budgetTotalRow}>
-                <Ionicons name="wallet-outline" size={14} color={N.primary} />
-                <Text style={styles.budgetTotalText}>
-                  Dự kiến tổng: ~{formatVND(budget * groupSize * days)}{'  '}({groupSize} người × {days} ngày)
-                </Text>
-              </View>
-            )}
+            <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>Ngân sách / người / ngày *</Text>
+            <View style={styles.budgetGrid}>
+              {BUDGETS.map((b) => {
+                const active = budget === b.value;
+                return (
+                  <TouchableOpacity key={b.value} style={[styles.budgetCard, active && styles.budgetCardActive]} onPress={() => setBudget(b.value)} activeOpacity={0.75}>
+                    <Text style={[styles.budgetLabel, active && styles.budgetLabelActive]}>{b.label}</Text>
+                    <Text style={styles.budgetSublabel}>{b.sublabel}</Text>
+                    {active && <View style={styles.budgetCheck}><Ionicons name="checkmark-circle" size={18} color={N.primary} /></View>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {/* Lưu trú */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Loại hình lưu trú</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'accommodation' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('accommodation')}
-            >
-              <Text style={accommodation ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                {accommodation || 'Chọn loại lưu trú...'}
-              </Text>
-              <Ionicons name={openDropdown === 'accommodation' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'accommodation' && (
-              <View style={styles.dropdownList}>
-                {ACCOMMODATIONS.map((a, i) => {
-                  const active = accommodation === a;
-                  return (
-                    <TouchableOpacity key={a} style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]} onPress={() => { setAccommodation(active ? '' : a); setOpenDropdown(null); }}>
-                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{a}</Text>
-                      {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+            <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>Lưu trú</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+              {ACCOMMODATIONS.map((a) => {
+                const active = accommodation === a;
+                return (
+                  <TouchableOpacity key={a} style={[styles.pillChip, active && styles.pillChipActive]} onPress={() => setAccommodation(active ? '' : a)} activeOpacity={0.75}>
+                    <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>{a}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-            {/* Di chuyển */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Phương tiện di chuyển</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'transport' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('transport')}
-            >
-              <Text style={transport ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                {transport || 'Chọn phương tiện...'}
-              </Text>
-              <Ionicons name={openDropdown === 'transport' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'transport' && (
-              <View style={styles.dropdownList}>
-                {TRANSPORTS.map((t, i) => {
-                  const active = transport === t;
-                  return (
-                    <TouchableOpacity key={t} style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]} onPress={() => { setTransport(active ? '' : t); setOpenDropdown(null); }}>
-                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{t}</Text>
-                      {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+            {/* Phương tiện */}
+            <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>Phương tiện</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+              {TRANSPORTS.map((t) => {
+                const active = transport === t;
+                return (
+                  <TouchableOpacity key={t} style={[styles.pillChip, active && styles.pillChipActive]} onPress={() => setTransport(active ? '' : t)} activeOpacity={0.75}>
+                    <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-            {/* Mức độ */}
-            <Text style={[styles.inputLabel, { marginTop: spacing.lg }]}>Mức độ hoạt động</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectBtn, openDropdown === 'activityLevel' && styles.selectBtnOpen]}
-              onPress={() => toggleDropdown('activityLevel')}
-            >
-              <Text style={activityLevel ? styles.selectBtnText : styles.selectBtnPlaceholder}>
-                {activityLevel || 'Chọn mức độ...'}
-              </Text>
-              <Ionicons name={openDropdown === 'activityLevel' ? 'chevron-up' : 'chevron-down'} size={16} color={N.onSurfaceVariant} />
-            </TouchableOpacity>
-            {openDropdown === 'activityLevel' && (
-              <View style={styles.dropdownList}>
-                {ACTIVITY_LEVELS.map((l, i) => {
-                  const active = activityLevel === l;
-                  return (
-                    <TouchableOpacity key={l} style={[styles.dropdownItem, i > 0 && styles.dropdownItemBorder]} onPress={() => { setActivityLevel(active ? '' : l); setOpenDropdown(null); }}>
-                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{l}</Text>
-                      {active && <Ionicons name="checkmark" size={16} color={N.primary} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+            {/* Mức độ hoạt động */}
+            <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>Mức độ hoạt động</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+              {ACTIVITY_LEVELS.map((l) => {
+                const active = activityLevel === l;
+                return (
+                  <TouchableOpacity key={l} style={[styles.pillChip, active && styles.pillChipActive]} onPress={() => setActivityLevel(active ? '' : l)} activeOpacity={0.75}>
+                    <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>{l}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
-        {/* ── STEP 3b — Manual ── */}
-        {step === '3b' && (
-          <View style={styles.stepContent}>
-            <Text style={styles.inputLabel}>Ngày đi (tùy chọn)</Text>
-            <DatePicker value={startDate} onChange={(v) => { setStartDate(v); if (endDate && endDate < v) setEndDate(''); }} placeholder="Chọn ngày khởi hành" />
+        {/* ── STEP MANUAL ── */}
+        {step === 'manual' && (
+          <View style={styles.formSection}>
+            <Text style={styles.manualQuestion}>Bạn định đi khi nào?</Text>
+            <Text style={styles.manualSubtitle}>Chọn thời gian để Viloca giúp bạn sắp xếp lịch trình tối ưu nhất.</Text>
 
-            <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Ngày về (tùy chọn)</Text>
-            <DatePicker value={endDate} onChange={setEndDate} placeholder="Chọn ngày về" minDate={startDate ? new Date(startDate) : undefined} />
+            <View style={styles.dateCard}>
+              <Text style={styles.dateCardLabel}>NGÀY ĐI</Text>
+              <DatePicker
+                value={startDate}
+                onChange={(v) => { setStartDate(v); if (endDate && endDate < v) setEndDate(''); }}
+                placeholder="Chọn ngày khởi hành"
+              />
+            </View>
+
+            <View style={[styles.dateCard, { marginTop: spacing.md }]}>
+              <Text style={styles.dateCardLabel}>NGÀY VỀ</Text>
+              <DatePicker
+                value={endDate}
+                onChange={setEndDate}
+                placeholder="Chọn ngày về"
+                minDate={startDate ? new Date(startDate) : undefined}
+              />
+            </View>
 
             <View style={styles.dateHint}>
-              <Ionicons name="information-circle-outline" size={13} color={N.onSurfaceVariant} />
-              <Text style={styles.dateHintText}>Ngày đi có thể thêm hoặc thay đổi sau trong trip</Text>
+              <Ionicons name="information-circle-outline" size={14} color={N.onSurfaceVariant} />
+              <Text style={styles.dateHintText}>Ngày đi có thể thêm sau nếu bạn chưa chắc chắn.</Text>
             </View>
           </View>
         )}
       </ScrollView>
 
-      {/* Fixed bottom button */}
+      {/* Fixed bottom buttons */}
       {step === 1 && (
         <View style={styles.bottomBar}>
-          <Button label="Tiếp theo →" onPress={goStep2} />
+          <TouchableOpacity style={styles.primaryBtn} onPress={goAI} activeOpacity={0.85}>
+            <Text style={styles.primaryBtnText}>✨  Tạo lịch trình với AI</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={goManual} activeOpacity={0.85}>
+            <Text style={styles.secondaryBtnText}>✏  Tự lên lịch</Text>
+          </TouchableOpacity>
         </View>
       )}
-      {step === '3a' && (
+      {step === 'ai' && (
         <View style={styles.bottomBar}>
           <Button label="✨ Tạo lịch trình AI" onPress={createWithAI} />
         </View>
       )}
-      {step === '3b' && (
+      {step === 'manual' && (
         <View style={styles.bottomBar}>
           <Button label="Tạo Trip" onPress={createManual} loading={saving} />
         </View>
@@ -689,98 +682,112 @@ export default function CreateTripScreen() {
 const N = colors.nomad;
 
 const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: N.background },
+  screen: { flex: 1, backgroundColor: N.background },
 
-  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow },
-  headerBack:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: N.onSurface },
+  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, backgroundColor: N.background },
+  headerBack:  { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: N.onSurface },
 
-  stepRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.lg, backgroundColor: N.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: N.outlineVariant },
-  stepItem:       { flexDirection: 'row', alignItems: 'center' },
-  stepDot:        { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: N.outlineVariant, alignItems: 'center', justifyContent: 'center', backgroundColor: N.background },
-  stepDotActive:  { borderColor: N.primary, backgroundColor: N.primary },
-  stepDotDone:    { borderColor: N.secondary, backgroundColor: N.secondary },
-  stepNum:        { fontSize: 11, fontWeight: '700', color: N.onSurfaceVariant },
-  stepLine:       { width: 44, height: 1.5, backgroundColor: N.outlineVariant, marginHorizontal: 4 },
-  stepLineDone:   { backgroundColor: N.secondary },
+  progressRow:       { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  progressItem:      { flex: 1, gap: 4 },
+  progressBar:       { height: 4, borderRadius: 4, backgroundColor: N.surfaceContainer },
+  progressBarFilled: { backgroundColor: N.primary },
+  progressDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: N.outlineVariant },
+  progressDotFilled: { backgroundColor: N.primary },
 
-  errorBox:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', padding: 12, marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: radius.md },
-  errorText:      { flex: 1, color: colors.error, fontSize: 13 },
+  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', padding: 12, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: radius.md },
+  errorText: { flex: 1, color: colors.error, fontSize: 13 },
 
-  stepContent:    { paddingTop: spacing.lg },
-  sectionLabel:   { fontSize: 15, fontWeight: '700', color: N.onSurface, marginBottom: spacing.md },
+  hero:                { height: 220, width: '100%', overflow: 'hidden', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroImg:             { width: '100%', height: '100%' },
+  heroCityWrap:        { position: 'absolute', bottom: 20, left: 20 },
+  heroCity:            { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: -0.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+  heroPlaceholder:     { flex: 1, backgroundColor: N.secondaryContainer + '40', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  heroPlaceholderText: { fontSize: 15, color: N.primary + '80', fontWeight: '600' },
 
-  inputLabel:     { fontSize: 13, fontWeight: '600', color: N.onSurfaceVariant, marginBottom: 6 },
-  input:          { borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: N.onSurface, backgroundColor: N.surfaceContainerLow },
-  destPicker:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  destPickerText: { fontSize: 15, color: N.onSurface, flex: 1 },
-  destPickerPlaceholder: { fontSize: 15, color: N.onSurfaceVariant, flex: 1 },
+  formSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  inputLabel:  { fontSize: 13, fontWeight: '600', color: N.onSurfaceVariant, marginBottom: 6 },
+  input:       { backgroundColor: N.surfaceContainerLow, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: N.onSurface },
+  inputHint:   { fontSize: 11, color: N.onSurfaceVariant, marginTop: 5, paddingHorizontal: 2 },
+  pickerRow:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: N.surfaceContainerLow, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 14 },
+  pickerRowText:        { fontSize: 16, fontWeight: '700', color: N.primary, flex: 1 },
+  pickerRowPlaceholder: { fontSize: 16, color: N.onSurfaceVariant, flex: 1 },
 
-  coverPreview:      { marginTop: spacing.md, height: 160, borderRadius: radius.lg, overflow: 'hidden' },
-  coverPreviewImg:   { width: '100%', height: '100%' },
-  coverPreviewLabel: { position: 'absolute', bottom: 10, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  coverPreviewText:  { fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
+  tipCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: N.secondaryContainer + '30', borderRadius: radius.lg, borderWidth: 1, borderColor: N.secondaryContainer + '50', padding: spacing.md, marginTop: spacing.lg },
+  tipText: { flex: 1, fontSize: 12, color: N.onSurface, lineHeight: 18 },
 
-  selectBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  selectBtnOpen:  { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
-  selectBtnText:  { fontSize: 15, color: N.onSurface, flex: 1 },
-  selectBtnPlaceholder: { fontSize: 15, color: N.onSurfaceVariant, flex: 1 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: N.onSurface, marginBottom: spacing.sm },
+  sectionLabel: { fontSize: 13, fontWeight: '600', color: N.onSurfaceVariant, marginBottom: 8 },
 
-  dropdownList:   { borderWidth: 1, borderColor: N.outlineVariant, borderTopWidth: 0, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, backgroundColor: N.surfaceContainerLow, marginBottom: 2 },
-  dropdownItem:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13 },
-  dropdownItemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: N.outlineVariant },
-  dropdownItemText: { fontSize: 14, color: N.onSurface },
-  dropdownItemTextActive: { color: N.primary, fontWeight: '700' },
-  dropdownItemSub: { fontSize: 12, color: N.onSurfaceVariant, marginTop: 2 },
+  chipScroll:        { marginHorizontal: -spacing.lg },
+  chipScrollContent: { paddingHorizontal: spacing.lg, gap: 8, flexDirection: 'row' },
+  chipWrap:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pillChip:          { paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.full, borderWidth: 1.5, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow },
+  pillChipActive:    { borderColor: N.primary, backgroundColor: N.primary },
+  pillChipText:      { fontSize: 14, color: N.onSurfaceVariant, fontWeight: '500' },
+  pillChipTextActive: { color: '#fff', fontWeight: '600' },
+  pillChipCustom:    { borderColor: N.primary, backgroundColor: N.secondaryContainer + '40', flexDirection: 'row', alignItems: 'center' },
+  pillChipTextCustom: { fontSize: 14, color: N.primary, fontWeight: '600' },
+  pillChipAdd:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.full, borderWidth: 1.5, borderColor: N.outlineVariant, borderStyle: 'dashed', backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 3 },
+  pillChipAddText:   { fontSize: 14, color: N.onSurfaceVariant, fontWeight: '500' },
+  vibeInputRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm },
+  vibeInput:         { flex: 1, backgroundColor: N.surfaceContainerLow, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: N.onSurface, borderWidth: 1.5, borderColor: N.primary },
+  vibeInputBtn:      { paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.lg, backgroundColor: N.primary },
+  vibeInputBtnText:  { fontSize: 14, fontWeight: '700', color: '#fff' },
+  vibeInputCancel:   { padding: 6 },
 
-  budgetTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 4 },
-  budgetTotalText: { fontSize: 13, color: N.primary, fontWeight: '600' },
+  stepperRow:       { flexDirection: 'row', gap: spacing.md },
+  stepperCard:      { flex: 1, backgroundColor: N.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1, borderColor: N.outlineVariant, padding: spacing.md },
+  stepperCardLabel: { fontSize: 12, color: N.onSurfaceVariant, marginBottom: spacing.sm },
+  stepperControls:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stepperBtn:       { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: N.outlineVariant, alignItems: 'center', justifyContent: 'center', backgroundColor: N.background },
+  stepperBtnText:   { fontSize: 18, color: N.onSurface, lineHeight: 22 },
+  stepperVal:       { fontSize: 16, fontWeight: '700', color: N.onSurface },
 
-  methodCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow, marginBottom: 12 },
-  methodIcon:     { width: 52, height: 52, borderRadius: radius.md, backgroundColor: N.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
-  methodTitle:    { fontSize: 16, fontWeight: '700', color: N.onSurface, marginBottom: 2 },
-  methodDesc:     { fontSize: 12, color: N.onSurfaceVariant, lineHeight: 17 },
+  budgetGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  budgetCard:        { width: '48%', padding: 14, borderRadius: radius.lg, borderWidth: 1.5, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow, position: 'relative' },
+  budgetCardActive:  { borderColor: N.primary, backgroundColor: N.primary + '10' },
+  budgetLabel:       { fontSize: 14, fontWeight: '600', color: N.onSurface, marginBottom: 3 },
+  budgetLabelActive: { color: N.primary },
+  budgetSublabel:    { fontSize: 12, color: N.onSurfaceVariant },
+  budgetCheck:       { position: 'absolute', top: 10, right: 10 },
 
-  chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow },
-  chipActive:     { borderColor: N.primary, backgroundColor: N.secondaryContainer },
-  chipText:       { fontSize: 13, color: N.onSurfaceVariant, fontWeight: '500' },
-  chipTextActive: { color: N.primary, fontWeight: '700' },
-
-  stepper:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
-  stepperBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: N.surfaceContainerLow },
-  stepperVal:     { paddingHorizontal: 20, fontSize: 15, fontWeight: '700', color: N.onSurface },
-
-  checkRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: spacing.md },
-  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: N.outlineVariant, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: N.primary, borderColor: N.primary },
-  checkLabel:     { fontSize: 14, color: N.onSurface },
-
-  dateHint:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
+  manualQuestion: { fontSize: 26, fontWeight: '800', color: N.onSurface, letterSpacing: -0.5, marginBottom: 8 },
+  manualSubtitle: { fontSize: 14, color: N.onSurfaceVariant, lineHeight: 20, marginBottom: spacing.xl },
+  dateCard:       { backgroundColor: N.surfaceContainerLow, borderRadius: radius.lg, padding: spacing.md },
+  dateCardLabel:  { fontSize: 11, fontWeight: '700', color: N.onSurfaceVariant, letterSpacing: 0.8, marginBottom: 6 },
+  dateHint:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.md },
   dateHintText:   { fontSize: 12, color: N.onSurfaceVariant },
 
-  bottomBar:      { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, paddingBottom: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow },
+  bottomBar:        { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, paddingBottom: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: N.outlineVariant, backgroundColor: N.background, gap: 10 },
+  primaryBtn:       { height: 54, borderRadius: radius.xl, backgroundColor: N.primary, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText:   { fontSize: 16, fontWeight: '700', color: '#fff' },
+  secondaryBtn:     { height: 54, borderRadius: radius.xl, borderWidth: 1.5, borderColor: N.primary, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtnText: { fontSize: 16, fontWeight: '700', color: N.primary },
 
-  overlay:               { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  provinceModal:         { backgroundColor: N.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
-  modalHandle:           { width: 40, height: 4, borderRadius: 2, backgroundColor: N.outlineVariant, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
-  provinceHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  provinceTitle:         { fontSize: 18, fontWeight: '800', color: N.onSurface },
-  provinceSearchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: N.background },
-  provinceSearchInput:   { flex: 1, fontSize: 14, color: N.onSurface },
-  provinceItem:          { paddingHorizontal: spacing.lg, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  provinceItemActive:    { backgroundColor: N.secondaryContainer },
-  provinceItemText:      { fontSize: 15, color: N.onSurface },
+  overlay:                { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  provinceModal:          { backgroundColor: N.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
+  modalHandle:            { width: 40, height: 4, borderRadius: 2, backgroundColor: N.outlineVariant, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
+  provinceHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  provinceTitle:          { fontSize: 18, fontWeight: '800', color: N.onSurface },
+  provinceSearchWrap:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: N.outlineVariant, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: N.background },
+  provinceSearchInput:    { flex: 1, fontSize: 14, color: N.onSurface },
+  provinceItem:           { paddingHorizontal: spacing.lg, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  provinceItemActive:     { backgroundColor: N.secondaryContainer + '40' },
+  provinceItemText:       { fontSize: 15, color: N.onSurface },
   provinceItemTextActive: { color: N.primary, fontWeight: '700' },
 
-  loadingScreen:   { flex: 1, backgroundColor: N.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  loadingContent:  { alignItems: 'center', maxWidth: 320, width: '100%' },
-  loadingIconWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: N.secondaryContainer, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  loadingTitle:    { fontSize: 22, fontWeight: '800', color: N.onSurface, textAlign: 'center', marginBottom: spacing.sm },
-  loadingSubtitle: { fontSize: 14, color: N.onSurfaceVariant, textAlign: 'center', lineHeight: 21, marginBottom: spacing.md },
-  logBox:          { width: '100%', backgroundColor: N.surfaceContainerLow, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: N.outlineVariant, gap: 8, marginTop: spacing.lg },
-  logRow:          { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logLine:         { flex: 1, fontSize: 13, color: N.onSurfaceVariant, lineHeight: 19 },
-  cancelBtn:       { marginTop: spacing.xl, paddingVertical: 12, paddingHorizontal: 32, borderRadius: radius.xl, borderWidth: 1, borderColor: N.outlineVariant },
-  cancelBtnText:   { fontSize: 14, fontWeight: '600', color: N.onSurfaceVariant },
+  loadingScreen:            { flex: 1, backgroundColor: N.background, alignItems: 'center' },
+  loadingProgress:          { flexDirection: 'row', gap: 8, paddingTop: spacing.xl, paddingHorizontal: spacing.xl },
+  loadingProgressBar:       { height: 4, width: 48, borderRadius: 4, backgroundColor: N.secondaryContainer + '40' },
+  loadingProgressBarFilled: { backgroundColor: N.primary },
+  loadingContent:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, maxWidth: 340, width: '100%' },
+  loadingIconWrap:          { width: 96, height: 96, borderRadius: 48, backgroundColor: N.secondaryContainer + '50', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  loadingTitle:             { fontSize: 22, fontWeight: '800', color: N.onSurface, textAlign: 'center', marginBottom: spacing.sm },
+  loadingSubtitle:          { fontSize: 14, color: N.onSurfaceVariant, textAlign: 'center', lineHeight: 21 },
+  logBox:                   { width: '100%', backgroundColor: '#F2EFE8', borderRadius: radius.lg, padding: spacing.lg, gap: 12, marginTop: spacing.xl },
+  logRow:                   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logLine:                  { flex: 1, fontSize: 13, color: N.onSurface, lineHeight: 19 },
+  cancelBtn:                { paddingVertical: 16, paddingHorizontal: 40 },
+  cancelBtnText:            { fontSize: 14, fontWeight: '600', color: N.onSurfaceVariant },
 });
