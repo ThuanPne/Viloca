@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Image, ActivityIndicator, Alert,
+  ImageBackground, ActivityIndicator, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
 import supabase from '@/src/lib/supabase';
+import { getCoverForDestination } from '@/src/lib/destination-covers';
 import type { Trip } from '@/src/types';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,7 +33,7 @@ function formatDate(iso: string) {
 }
 
 function tripCoverUrl(trip: Trip) {
-  return trip.cover_image ?? `https://picsum.photos/seed/trip-${trip.id}/400/200`;
+  return getCoverForDestination(trip.destination, trip.id);
 }
 
 const N = colors.nomad;
@@ -121,32 +122,47 @@ export default function WorkspaceScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.tripCard}
-              activeOpacity={0.9}
+              activeOpacity={0.92}
               onPress={() => router.push(`/trip/${item.id}`)}
               onLongPress={() => confirmDeleteTrip(item)}
               delayLongPress={500}
             >
+              {/* ── Ảnh phía trên ── */}
               <View style={styles.tripImageWrap}>
-                <Image source={{ uri: tripCoverUrl(item) }} style={styles.tripImage} />
-                <View style={styles.tripOverlay} />
-                <View style={styles.tripBadge}>
+                <ImageBackground
+                  source={{ uri: tripCoverUrl(item) }}
+                  style={styles.tripImage}
+                  imageStyle={styles.tripImageStyle}
+                  resizeMode="cover"
+                />
+                <View style={styles.tripBadgeWrap}>
                   <Badge label={STATUS_LABEL[item.status]} color={STATUS_COLOR[item.status]} />
+                  {item.is_ai_generated && (
+                    <View style={styles.aiBadge}>
+                      <Ionicons name="sparkles" size={11} color="#fff" />
+                      <Text style={styles.aiBadgeText}>AI</Text>
+                    </View>
+                  )}
                 </View>
-                {item.is_ai_generated && (
-                  <View style={styles.aiBadge}>
-                    <Ionicons name="sparkles" size={11} color="#fff" />
-                    <Text style={styles.aiBadgeText}>AI</Text>
-                  </View>
-                )}
               </View>
+
+              {/* ── Thông tin phía dưới ── */}
               <View style={styles.tripInfo}>
                 <Text style={styles.tripTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.tripDest}>📍 {item.destination}</Text>
-                {item.start_date ? (
-                  <Text style={styles.tripDate}>
-                    {formatDate(item.start_date)}{item.end_date ? ` → ${formatDate(item.end_date)}` : ''}
-                  </Text>
-                ) : null}
+                <View style={styles.tripMeta}>
+                  <View style={styles.tripMetaItem}>
+                    <Ionicons name="location-outline" size={12} color={N.onSurfaceVariant} />
+                    <Text style={styles.tripMetaText}>{item.destination}</Text>
+                  </View>
+                  {item.start_date && (
+                    <View style={styles.tripMetaItem}>
+                      <Ionicons name="calendar-outline" size={12} color={N.onSurfaceVariant} />
+                      <Text style={styles.tripMetaText}>
+                        {formatDate(item.start_date)}{item.end_date ? ` → ${formatDate(item.end_date)}` : ''}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -167,15 +183,16 @@ const styles = StyleSheet.create({
   addBtn:        { flexDirection: 'row', alignItems: 'center', backgroundColor: N.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
   addText:       { color: N.onPrimary, fontWeight: '600', fontSize: 14 },
 
-  tripCard:      { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: N.surface, elevation: 2 },
-  tripImageWrap: { height: 100, overflow: 'hidden' },
-  tripImage:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: 100, resizeMode: 'cover' },
-  tripOverlay:   { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.2)' },
-  tripBadge:     { position: 'absolute', top: 12, right: 12 },
-  aiBadge:       { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.85)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
-  aiBadgeText:   { fontSize: 10, color: '#fff', fontWeight: '700' },
-  tripInfo:      { paddingHorizontal: spacing.md, paddingVertical: 6 },
-  tripTitle:     { fontSize: 14, fontWeight: '700', color: N.onSurface, marginBottom: 1 },
-  tripDest:      { fontSize: 11, color: N.onSurfaceVariant },
-  tripDate:      { fontSize: 11, color: N.primary, marginTop: 1, fontWeight: '500' },
+  tripCard:        { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: N.surface, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8 },
+  tripImageWrap:   { height: 160, position: 'relative' },
+  tripImage:       { height: 160 },
+  tripImageStyle:  { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl },
+  tripBadgeWrap:   { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  aiBadge:         { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(69,97,27,0.88)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  aiBadgeText:     { fontSize: 10, color: '#fff', fontWeight: '700' },
+  tripInfo:        { paddingHorizontal: spacing.md, paddingVertical: spacing.md, gap: 6 },
+  tripTitle:       { fontSize: 17, fontWeight: '800', color: N.onSurface, lineHeight: 22 },
+  tripMeta:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tripMetaItem:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tripMetaText:    { fontSize: 12, color: N.onSurfaceVariant, fontWeight: '500' },
 });
