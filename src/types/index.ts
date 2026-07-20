@@ -182,6 +182,9 @@ export interface TripJournal {
   created_at: string;
 }
 
+export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
+export type PostVisibility = 'public' | 'friends' | 'only_me';
+
 export interface Post {
   id: string;
   user_id: string;
@@ -191,10 +194,12 @@ export interface Post {
   trip_id: string | null;
   likes_count: number;
   comments_count: number;
+  visibility?: PostVisibility;
   created_at: string;
   updated_at: string;
   profiles?: { full_name: string | null; avatar_url: string | null } | null;
-  post_likes?: { user_id: string }[];
+  post_likes?: { user_id: string; reaction_type?: ReactionType }[];
+  post_saves?: { user_id: string }[];
 }
 
 export interface PostComment {
@@ -202,6 +207,8 @@ export interface PostComment {
   post_id: string;
   user_id: string;
   content: string;
+  parent_id: string | null;
   created_at: string;
   profiles?: { full_name: string | null; avatar_url: string | null } | null;
+  comment_likes?: { user_id: string }[];
 }

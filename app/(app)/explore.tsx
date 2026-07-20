@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, Alert,
+  View, Text, StyleSheet, FlatList, ScrollView, RefreshControl, Alert, Modal,
   Image, TouchableOpacity, Dimensions, Share, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { router, useFocusEffect } from 'expo-router';
 import supabase from '@/src/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/src/theme/colors';
-import type { Post } from '@/src/types';
+import type { Post, ReactionType } from '@/src/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PAGE_SIZE = 10;
@@ -63,6 +63,27 @@ const MOCK_POSTS: Post[] = [
     post_likes: [],
   },
 ];
+
+// ─── Reactions ────────────────────────────────────────────────────────────────
+
+const REACTIONS: { type: ReactionType; emoji: string; label: string }[] = [
+  { type: 'like',  emoji: '👍', label: 'Thích' },
+  { type: 'love',  emoji: '❤️', label: 'Yêu thích' },
+  { type: 'haha',  emoji: '😂', label: 'Haha' },
+  { type: 'wow',   emoji: '😮', label: 'Wow' },
+  { type: 'sad',   emoji: '😢', label: 'Buồn' },
+  { type: 'angry', emoji: '😡', label: 'Phẫn nộ' },
+];
+
+const REACTION_EMOJI: Record<string, string> = Object.fromEntries(REACTIONS.map((r) => [r.type, r.emoji]));
+
+function getTopReactions(likes?: { user_id: string; reaction_type?: string }[]): { emojis: string; count: number } {
+  if (!likes?.length) return { emojis: '', count: 0 };
+  const counts: Record<string, number> = {};
+  likes.forEach((l) => { const t = l.reaction_type ?? 'like'; counts[t] = (counts[t] ?? 0) + 1; });
+  const emojis = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([t]) => REACTION_EMOJI[t] ?? '👍').join('');
+  return { emojis, count: likes.length };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,17 +166,21 @@ function ImageCarousel({ images }: { images: string[] | null | undefined }) {
 
 // ─── Post card ────────────────────────────────────────────────────────────────
 
-function PostCard({ post, currentUserId, onLike, onDelete }: {
+function PostCard({ post, currentUserId, onReact, onLongPressLike, onSave, onDelete }: {
   post: Post;
   currentUserId?: string;
-  onLike: (post: Post) => void;
+  onReact: (post: Post, type: ReactionType) => void;
+  onLongPressLike: (post: Post) => void;
+  onSave: (post: Post) => void;
   onDelete: (postId: string) => void;
 }) {
   const [showFull, setShowFull] = useState(false);
-  const liked   = post.post_likes?.some((l) => l.user_id === currentUserId) ?? false;
-  const isMock  = post.id.startsWith('mock-');
-  const isOwn   = !isMock && post.user_id === currentUserId;
+  const userReaction = post.post_likes?.find((l) => l.user_id === currentUserId)?.reaction_type;
+  const isSaved  = post.post_saves?.some((s) => s.user_id === currentUserId) ?? false;
+  const isMock   = post.id.startsWith('mock-');
+  const isOwn    = !isMock && post.user_id === currentUserId;
   const longText = (post.content?.length ?? 0) > 120;
+  const { emojis, count } = getTopReactions(post.post_likes);
 
   function handleMenu() {
     if (isMock) return;
@@ -171,6 +196,9 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
       ]);
     }
   }
+
+  const reactionLabel = userReaction ? (REACTION_EMOJI[userReaction] ?? '👍') : '🤍';
+  const reactionColor = userReaction ? '#EF4444' : colors.nomad.onSurfaceVariant;
 
   return (
     <View style={s.postCard}>
@@ -208,9 +236,17 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
       <ImageCarousel images={post.images} />
 
       <View style={s.postActions}>
-        <TouchableOpacity style={s.actionBtn} onPress={() => onLike(post)} activeOpacity={0.7}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? '#EF4444' : colors.nomad.onSurfaceVariant} />
-          <Text style={[s.actionCount, liked && { color: '#EF4444' }]}>{post.likes_count}</Text>
+        <TouchableOpacity
+          style={s.actionBtn}
+          onPress={() => !isMock && onReact(post, userReaction as ReactionType ?? 'like')}
+          onLongPress={() => !isMock && onLongPressLike(post)}
+          delayLongPress={400}
+          activeOpacity={0.7}
+        >
+          <Text style={[s.reactionIcon, { color: reactionColor }]}>{reactionLabel}</Text>
+          <Text style={[s.actionCount, userReaction && { color: '#EF4444' }]}>
+            {emojis ? `${emojis} ${count}` : count > 0 ? String(count) : ''}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.actionBtn} onPress={() => !isMock && router.push(`/post/${post.id}`)} activeOpacity={0.7}>
           <Ionicons name="chatbubble-outline" size={21} color={colors.nomad.onSurfaceVariant} />
@@ -221,8 +257,8 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
           <Text style={s.actionCount}>Chia sẻ</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        <TouchableOpacity style={{ padding: 4 }}>
-          <Ionicons name="bookmark-outline" size={21} color={colors.nomad.onSurfaceVariant} />
+        <TouchableOpacity style={{ padding: 4 }} onPress={() => !isMock && onSave(post)} activeOpacity={0.7}>
+          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={21} color={isSaved ? colors.nomad.primary : colors.nomad.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
     </View>
@@ -235,11 +271,12 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const user   = useAuthStore((s) => s.user);
 
-  const [realPosts, setRealPosts]     = useState<Post[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore]         = useState(true);
+  const [realPosts, setRealPosts]           = useState<Post[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [refreshing, setRefreshing]         = useState(false);
+  const [loadingMore, setLoadingMore]       = useState(false);
+  const [hasMore, setHasMore]               = useState(true);
+  const [reactionPickerPost, setReactionPickerPost] = useState<Post | null>(null);
 
   async function fetchPosts(from = 0, append = false, isRefresh = false) {
     if (isRefresh) setRefreshing(true);
@@ -247,7 +284,8 @@ export default function ExploreScreen() {
 
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, post_likes(user_id), post_comments(count)')
+      .select('*, post_likes(user_id, reaction_type), post_saves(user_id), post_comments(count)')
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
@@ -287,23 +325,51 @@ export default function ExploreScreen() {
     ? [...realPosts, ...MOCK_POSTS]
     : MOCK_POSTS;
 
-  async function handleLike(post: Post) {
+  async function handleReact(post: Post, reactionType: ReactionType) {
     if (!user || post.id.startsWith('mock-')) return;
-    const liked = post.post_likes?.some((l) => l.user_id === user.id);
-    if (liked) {
-      await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+    const existing = post.post_likes?.find((l) => l.user_id === user.id);
+    if (existing) {
+      if (existing.reaction_type === reactionType) {
+        await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+      } else {
+        await supabase.from('post_likes').update({ reaction_type: reactionType }).eq('post_id', post.id).eq('user_id', user.id);
+      }
     } else {
-      await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
+      await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id, reaction_type: reactionType });
     }
     setRealPosts((prev) => prev.map((p) => {
       if (p.id !== post.id) return p;
-      const wasLiked = p.post_likes?.some((l) => l.user_id === user.id);
+      const ex = p.post_likes?.find((l) => l.user_id === user.id);
+      let newLikes: typeof p.post_likes;
+      if (ex) {
+        if (ex.reaction_type === reactionType) {
+          newLikes = (p.post_likes ?? []).filter((l) => l.user_id !== user.id);
+        } else {
+          newLikes = (p.post_likes ?? []).map((l) => l.user_id === user.id ? { ...l, reaction_type: reactionType } : l);
+        }
+      } else {
+        newLikes = [...(p.post_likes ?? []), { user_id: user.id, reaction_type: reactionType }];
+      }
+      return { ...p, likes_count: Math.max(0, newLikes?.length ?? p.likes_count), post_likes: newLikes };
+    }));
+  }
+
+  async function handleSave(post: Post) {
+    if (!user || post.id.startsWith('mock-')) return;
+    const saved = post.post_saves?.some((s) => s.user_id === user.id);
+    if (saved) {
+      await supabase.from('post_saves').delete().eq('post_id', post.id).eq('user_id', user.id);
+    } else {
+      await supabase.from('post_saves').insert({ post_id: post.id, user_id: user.id });
+    }
+    setRealPosts((prev) => prev.map((p) => {
+      if (p.id !== post.id) return p;
+      const wasSaved = p.post_saves?.some((s) => s.user_id === user.id);
       return {
         ...p,
-        likes_count: wasLiked ? p.likes_count - 1 : p.likes_count + 1,
-        post_likes: wasLiked
-          ? (p.post_likes ?? []).filter((l) => l.user_id !== user.id)
-          : [...(p.post_likes ?? []), { user_id: user.id }],
+        post_saves: wasSaved
+          ? (p.post_saves ?? []).filter((s) => s.user_id !== user.id)
+          : [...(p.post_saves ?? []), { user_id: user.id }],
       };
     }));
   }
@@ -376,7 +442,16 @@ export default function ExploreScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => <PostCard post={item} currentUserId={user?.id} onLike={handleLike} onDelete={handleDelete} />}
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            currentUserId={user?.id}
+            onReact={handleReact}
+            onLongPressLike={setReactionPickerPost}
+            onSave={handleSave}
+            onDelete={handleDelete}
+          />
+        )}
         ItemSeparatorComponent={() => <View style={s.postDivider} />}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={colors.nomad.primary} /> : null}
         refreshControl={
@@ -388,6 +463,35 @@ export default function ExploreScreen() {
           />
         }
       />
+
+      {/* Reaction picker modal */}
+      <Modal
+        visible={!!reactionPickerPost}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactionPickerPost(null)}
+      >
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setReactionPickerPost(null)}>
+          <View style={s.pickerContainer}>
+            <Text style={s.pickerTitle}>Chọn cảm xúc</Text>
+            <View style={s.pickerRow}>
+              {REACTIONS.map((r) => (
+                <TouchableOpacity
+                  key={r.type}
+                  style={s.pickerItem}
+                  onPress={() => {
+                    if (reactionPickerPost) handleReact(reactionPickerPost, r.type);
+                    setReactionPickerPost(null);
+                  }}
+                >
+                  <Text style={s.pickerEmoji}>{r.emoji}</Text>
+                  <Text style={s.pickerLabel}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -442,4 +546,13 @@ const s = StyleSheet.create({
   postActions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   actionBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 6 },
   actionCount: { fontSize: 13, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  reactionIcon: { fontSize: 20 },
+
+  pickerOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  pickerContainer: { backgroundColor: colors.nomad.surface, borderRadius: 20, padding: 20, width: '88%', maxWidth: 360 },
+  pickerTitle:     { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface, textAlign: 'center', marginBottom: 16 },
+  pickerRow:       { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: 8 },
+  pickerItem:      { alignItems: 'center', width: 72, paddingVertical: 8 },
+  pickerEmoji:     { fontSize: 32, marginBottom: 4 },
+  pickerLabel:     { fontSize: 11, color: colors.nomad.onSurfaceVariant, textAlign: 'center' },
 });

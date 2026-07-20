@@ -10,6 +10,7 @@ import supabase from '@/src/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
+import type { PostVisibility } from '@/src/types';
 
 const MAX_IMAGES = 5;
 
@@ -18,9 +19,10 @@ type ImageAsset = { uri: string; mimeType: string; ext: string; base64: string }
 export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
   const { trip_id } = useLocalSearchParams<{ trip_id?: string }>();
-  const [content, setContent]     = useState('');
-  const [images, setImages]       = useState<ImageAsset[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [content, setContent]         = useState('');
+  const [images, setImages]           = useState<ImageAsset[]>([]);
+  const [uploading, setUploading]     = useState(false);
+  const [visibility, setVisibility]   = useState<PostVisibility>('public');
 
   async function pickImages() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -101,6 +103,7 @@ export default function CreatePostScreen() {
         content: content.trim() || null,
         images: uploadedUrls,
         trip_id: trip_id ?? null,
+        visibility,
       });
 
       if (error) {
@@ -142,6 +145,26 @@ export default function CreatePostScreen() {
             <Text style={styles.tripBannerText}>Bài viết sẽ được gắn với chuyến đi của bạn</Text>
           </View>
         )}
+
+        {/* Visibility picker */}
+        <View style={styles.visibilityRow}>
+          {([
+            { value: 'public',  label: 'Công khai', icon: 'earth-outline' },
+            { value: 'friends', label: 'Bạn bè',    icon: 'people-outline' },
+            { value: 'only_me', label: 'Chỉ mình',  icon: 'lock-closed-outline' },
+          ] as const).map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.visChip, visibility === opt.value && styles.visChipActive]}
+              onPress={() => setVisibility(opt.value)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name={opt.icon} size={14} color={visibility === opt.value ? colors.nomad.primary : colors.nomad.onSurfaceVariant} />
+              <Text style={[styles.visChipText, visibility === opt.value && styles.visChipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <TextInput
           style={styles.input}
           multiline
@@ -198,4 +221,9 @@ const styles = StyleSheet.create({
   addImageText: { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
   tripBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e8f0d8', borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
   tripBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '500', flex: 1 },
+  visibilityRow:   { flexDirection: 'row', gap: 8 },
+  visChip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.surfaceContainer },
+  visChipActive:   { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
+  visChipText:     { fontSize: 13, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  visChipTextActive: { color: colors.nomad.primary, fontWeight: '700' },
 });
