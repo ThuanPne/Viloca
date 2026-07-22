@@ -110,7 +110,13 @@ export default function PostDetailScreen() {
 
   async function handleShare() {
     if (!post) return;
-    await Share.share({ message: `Xem bài viết trên Viloca: viloca://post/${post.id}` });
+    const authorName = post.profiles?.full_name ?? 'Ai đó';
+    const preview    = post.content ? post.content.slice(0, 100) + (post.content.length > 100 ? '...' : '') : 'Chia sẻ ảnh du lịch';
+    await Share.share({
+      title:   `${authorName} trên Viloca`,
+      message: `${preview}\n\n🗺️ Xem trên Viloca: viloca://post/${post.id}`,
+      url:     post.images?.[0],
+    });
   }
 
   async function handleDeleteComment(comment: PostComment) {

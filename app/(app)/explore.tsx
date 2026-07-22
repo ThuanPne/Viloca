@@ -252,7 +252,11 @@ function PostCard({ post, currentUserId, onReact, onLongPressLike, onSave, onDel
           <Ionicons name="chatbubble-outline" size={21} color={colors.nomad.onSurfaceVariant} />
           <Text style={s.actionCount}>{post.comments_count}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.actionBtn} onPress={() => Share.share({ message: `Xem bài viết trên Viloca: viloca://post/${post.id}` })} activeOpacity={0.7}>
+        <TouchableOpacity style={s.actionBtn} onPress={() => {
+          const authorName = post.profiles?.full_name ?? 'Ai đó';
+          const preview    = post.content ? post.content.slice(0, 100) + (post.content.length > 100 ? '...' : '') : 'Chia sẻ ảnh du lịch';
+          Share.share({ title: `${authorName} trên Viloca`, message: `${preview}\n\n🗺️ Xem trên Viloca: viloca://post/${post.id}`, url: post.images?.[0] });
+        }} activeOpacity={0.7}>
           <Ionicons name="paper-plane-outline" size={21} color={colors.nomad.onSurfaceVariant} />
           <Text style={s.actionCount}>Chia sẻ</Text>
         </TouchableOpacity>
