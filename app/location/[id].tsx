@@ -7,7 +7,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '@/lib/supabase';
+import supabase from '@/src/lib/supabase';
 import { useFavorite } from '@/src/hooks/useFavorite';
 import { colors } from '@/src/theme/colors';
 import type { Location } from '@/src/types';
@@ -88,7 +88,7 @@ export default function LocationDetailScreen() {
     : [];
   const subtitle = [location.district, location.city === 'SG' ? 'TP. Hồ Chí Minh' : location.city === 'HN' ? 'Hà Nội' : location.city === 'DN' ? 'Đà Nẵng' : location.city].filter(Boolean).join(', ');
 
-  const hasLongDesc = location.long_description && location.long_description.length > 0;
+  const hasLongDesc = location.description && location.description.length > 0;
   const hasMapsUrl = !!location.google_maps_url;
 
   return (
@@ -200,7 +200,7 @@ export default function LocationDetailScreen() {
               style={styles.longDesc}
               numberOfLines={descExpanded ? undefined : LONG_DESC_LINES}
             >
-              {location.long_description}
+              {location.description}
             </Text>
             <TouchableOpacity onPress={() => setDescExpanded((v) => !v)} style={styles.expandBtn}>
               <Text style={styles.expandText}>

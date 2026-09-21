@@ -29,6 +29,6 @@ export function Avatar({ uri, name, size = 48 }: Props) {
 
 const styles = StyleSheet.create({
   image:    { resizeMode: 'cover' },
-  fallback: { backgroundColor: colors.primary100, alignItems: 'center', justifyContent: 'center' },
-  initials: { color: colors.primary600, fontWeight: '700' },
+  fallback: { backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: colors.nomad.primary, fontWeight: '700' },
 });

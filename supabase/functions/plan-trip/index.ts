@@ -54,6 +54,8 @@ const TRAVELING_WITH_LABEL: Record<string, string> = {
   friends: 'nhóm bạn',
 };
 
+const JSON_HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -69,12 +71,35 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
+  // ── JWT verification ──────────────────────────────────────────────────────
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: JSON_HEADERS });
+  }
+
+  const jwt = authHeader.slice(7);
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt);
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: JSON_HEADERS });
+  }
+
+  // ── Credits check ─────────────────────────────────────────────────────────
+  const { data: profile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('plan, ai_credits_remaining')
+    .eq('id', user.id)
+    .single();
+
+  if (profileErr || !profile) {
+    return new Response(JSON.stringify({ error: 'User profile not found' }), { status: 403, headers: JSON_HEADERS });
+  }
+
+  const isFree = profile.plan !== 'pro';
+  if (isFree && profile.ai_credits_remaining <= 0) {
+    return new Response(
+      JSON.stringify({ error: 'No AI credits remaining', credits_remaining: 0 }),
+      { status: 402, headers: JSON_HEADERS },
+    );
   }
 
   let body: PlanRequest;
@@ -129,7 +154,7 @@ Deno.serve(async (req) => {
         if (!fb3?.length) {
           return new Response(
             JSON.stringify({ error: 'Database has no active locations.', detail: locErr?.message ?? fb3Err?.message }),
-            { status: 404, headers: { 'Content-Type': 'application/json' } },
+            { status: 404, headers: JSON_HEADERS },
           );
         }
         finalLocations = fb3;
@@ -239,7 +264,7 @@ Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (
   } catch (err) {
     return new Response(
       JSON.stringify({ error: 'AI call failed', detail: String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
+      { status: 500, headers: JSON_HEADERS },
     );
   }
 
@@ -253,7 +278,7 @@ Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (
     plan = JSON.parse(cleaned);
   } catch {
     return new Response(JSON.stringify({ error: 'AI returned invalid JSON', raw }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
+      { status: 500, headers: JSON_HEADERS },
     );
   }
 
@@ -271,11 +296,21 @@ Với mỗi slot, giải thích ngắn gọn lý do chọn địa điểm này (
       })),
   }));
 
-  return new Response(JSON.stringify({ days: enriched }), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
+  // ── Decrement credits atomically (free users only, only on success) ───────
+  let creditsRemaining: number | null = null;
+  if (isFree) {
+    const { data: updated } = await supabase
+      .from('profiles')
+      .update({ ai_credits_remaining: profile.ai_credits_remaining - 1 })
+      .eq('id', user.id)
+      .gt('ai_credits_remaining', 0)
+      .select('ai_credits_remaining')
+      .single();
+    creditsRemaining = updated?.ai_credits_remaining ?? null;
+  }
+
+  return new Response(
+    JSON.stringify({ days: enriched, ...(creditsRemaining !== null && { credits_remaining: creditsRemaining }) }),
+    { status: 200, headers: JSON_HEADERS },
+  );
 });

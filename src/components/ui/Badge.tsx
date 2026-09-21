@@ -10,18 +10,18 @@ interface Props {
 }
 
 const bg: Record<Color, string> = {
-  primary: colors.primary600,
-  forest:  colors.secondary600,
+  primary: colors.nomad.primary,
+  forest:  colors.nomad.primaryContainer,
   warning: colors.warning,
   error:   colors.error,
-  neutral: colors.border,
+  neutral: colors.nomad.outlineVariant,
 };
 const text: Record<Color, string> = {
-  primary: colors.textOnDark,
-  forest:  colors.textOnDark,
-  warning: colors.textOnDark,
-  error:   colors.textOnDark,
-  neutral: colors.textMuted,
+  primary: colors.nomad.onPrimary,
+  forest:  colors.nomad.onPrimary,
+  warning: colors.nomad.onPrimary,
+  error:   colors.nomad.onPrimary,
+  neutral: colors.nomad.onSurfaceVariant,
 };
 
 export function Badge({ label, color = 'neutral' }: Props) {

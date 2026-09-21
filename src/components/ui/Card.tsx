@@ -21,10 +21,10 @@ export function Card({ children, onPress, style }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.nomad.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.nomad.outlineVariant,
     overflow: 'hidden',
     ...shadow.card,
   },

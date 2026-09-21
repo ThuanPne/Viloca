@@ -4,7 +4,8 @@ import { View, ActivityIndicator } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { supabase } from '@/lib/supabase';
+import supabase from '@/src/lib/supabase';
+import { colors } from '@/src/theme/colors';
 import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
@@ -35,8 +36,8 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       {!isReady ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.nomad.background }}>
+          <ActivityIndicator size="large" color={colors.nomad.primary} />
         </View>
       ) : (
         <>

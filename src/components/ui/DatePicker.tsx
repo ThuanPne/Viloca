@@ -61,11 +61,11 @@ export function DatePicker({ value, onChange, placeholder = 'Chọn ngày', minD
   return (
     <>
       <TouchableOpacity style={styles.trigger} onPress={() => setVisible(true)}>
-        <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+        <Ionicons name="calendar-outline" size={16} color={colors.nomad.onSurfaceVariant} />
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
           {value ? displayLabel(value) : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
+        <Ionicons name="chevron-down" size={14} color={colors.nomad.onSurfaceVariant} />
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
@@ -74,11 +74,11 @@ export function DatePicker({ value, onChange, placeholder = 'Chọn ngày', minD
             {/* Month nav */}
             <View style={styles.nav}>
               <TouchableOpacity onPress={() => setCursor(new Date(year, month - 1, 1))} style={styles.navBtn}>
-                <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+                <Ionicons name="chevron-back" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
               <Text style={styles.navTitle}>{MONTHS[month]} {year}</Text>
               <TouchableOpacity onPress={() => setCursor(new Date(year, month + 1, 1))} style={styles.navBtn}>
-                <Ionicons name="chevron-forward" size={20} color={colors.textPrimary} />
+                <Ionicons name="chevron-forward" size={20} color={colors.nomad.onSurface} />
               </TouchableOpacity>
             </View>
 
@@ -123,21 +123,21 @@ export function DatePicker({ value, onChange, placeholder = 'Chọn ngày', minD
 const CELL = 40;
 
 const styles = StyleSheet.create({
-  trigger:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.bgCard },
-  triggerText:  { flex: 1, fontSize: 15, color: colors.textPrimary },
-  placeholder:  { color: colors.textMuted },
+  trigger:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.nomad.surfaceContainerLow },
+  triggerText:  { flex: 1, fontSize: 15, color: colors.nomad.onSurface },
+  placeholder:  { color: colors.nomad.onSurfaceVariant },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
-  card:         { backgroundColor: colors.bgCard, borderRadius: radius.xl, padding: spacing.lg, width: 320 },
+  card:         { backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.xl, padding: spacing.lg, width: 320 },
   nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle:     { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  navTitle:     { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface },
   dowRow:       { flexDirection: 'row', marginBottom: spacing.sm },
-  dowText:      { width: CELL, textAlign: 'center', fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  dowText:      { width: CELL, textAlign: 'center', fontSize: 12, fontWeight: '600', color: colors.nomad.onSurfaceVariant },
   grid:         { flexDirection: 'row', flexWrap: 'wrap' },
   cell:         { width: CELL, height: CELL, alignItems: 'center', justifyContent: 'center', borderRadius: CELL / 2 },
-  cellSelected: { backgroundColor: colors.primary600 },
-  cellToday:    { borderWidth: 1.5, borderColor: colors.primary600 },
-  cellText:     { fontSize: 14, color: colors.textPrimary },
+  cellSelected: { backgroundColor: colors.nomad.primary },
+  cellToday:    { borderWidth: 1.5, borderColor: colors.nomad.primary },
+  cellText:     { fontSize: 14, color: colors.nomad.onSurface },
   cellTextSel:  { color: colors.textOnDark, fontWeight: '600' },
-  cellTextDis:  { color: colors.border },
+  cellTextDis:  { color: colors.nomad.outlineVariant },
 });

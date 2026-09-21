@@ -209,8 +209,8 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
 
       <View style={s.postActions}>
         <TouchableOpacity style={s.actionBtn} onPress={() => onLike(post)} activeOpacity={0.7}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? '#EF4444' : colors.nomad.onSurfaceVariant} />
-          <Text style={[s.actionCount, liked && { color: '#EF4444' }]}>{post.likes_count}</Text>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? colors.error : colors.nomad.onSurfaceVariant} />
+          <Text style={[s.actionCount, liked && { color: colors.error }]}>{post.likes_count}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.actionBtn} onPress={() => !isMock && router.push(`/post/${post.id}`)} activeOpacity={0.7}>
           <Ionicons name="chatbubble-outline" size={21} color={colors.nomad.onSurfaceVariant} />
@@ -331,13 +331,13 @@ export default function ExploreScreen() {
         </TouchableOpacity>
         <View style={s.createDivider} />
         <TouchableOpacity style={s.createAction} onPress={() => router.push('/post/create')}>
-          <Ionicons name="videocam-outline" size={18} color="#EF4444" />
-          <Text style={[s.createActionText, { color: '#EF4444' }]}>Reels</Text>
+          <Ionicons name="videocam-outline" size={18} color={colors.error} />
+          <Text style={[s.createActionText, { color: colors.error }]}>Reels</Text>
         </TouchableOpacity>
         <View style={s.createDivider} />
         <TouchableOpacity style={s.createAction} onPress={() => router.push('/post/create')}>
-          <Ionicons name="location-outline" size={18} color="#F59E0B" />
-          <Text style={[s.createActionText, { color: '#F59E0B' }]}>Địa điểm</Text>
+          <Ionicons name="location-outline" size={18} color={colors.warning} />
+          <Text style={[s.createActionText, { color: colors.warning }]}>Địa điểm</Text>
         </TouchableOpacity>
       </View>
 

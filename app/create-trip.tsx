@@ -12,6 +12,7 @@ import { colors } from '@/src/theme/colors';
 import { spacing, radius } from '@/src/theme/spacing';
 import supabase from '@/src/lib/supabase';
 import { getCoverForDestination, DESTINATION_COVERS } from '@/src/lib/destination-covers';
+import { stripDiacritics } from '@/src/lib/trip-utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,10 +59,6 @@ const AI_LOG_STEPS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function stripDiacritics(str: string) {
-  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, (c) => c === 'đ' ? 'd' : 'D');
-}
 
 function getCoverImage(destination: string): string {
   return getCoverForDestination(destination, destination);
@@ -785,7 +782,7 @@ const styles = StyleSheet.create({
   loadingIconWrap:          { width: 96, height: 96, borderRadius: 48, backgroundColor: N.secondaryContainer + '50', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
   loadingTitle:             { fontSize: 22, fontWeight: '800', color: N.onSurface, textAlign: 'center', marginBottom: spacing.sm },
   loadingSubtitle:          { fontSize: 14, color: N.onSurfaceVariant, textAlign: 'center', lineHeight: 21 },
-  logBox:                   { width: '100%', backgroundColor: '#F2EFE8', borderRadius: radius.lg, padding: spacing.lg, gap: 12, marginTop: spacing.xl },
+  logBox:                   { width: '100%', backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, padding: spacing.lg, gap: 12, marginTop: spacing.xl },
   logRow:                   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logLine:                  { flex: 1, fontSize: 13, color: N.onSurface, lineHeight: 19 },
   cancelBtn:                { paddingVertical: 16, paddingHorizontal: 40 },

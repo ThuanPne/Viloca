@@ -148,7 +148,7 @@ export default function ExperienceDetailScreen() {
 
   const maxDays = selectedTrip ? tripDayCount(selectedTrip) : 7;
   const cityLine = [location.district, location.city ?? location.address].filter(Boolean).join(', ');
-  const longDesc   = location.long_description ?? location.description ?? '';
+  const longDesc   = location.description ?? location.short_description ?? '';
   const shortText  = location.hint ?? location.short_description ?? '';
   const fullDesc   = longDesc;
   const TRUNCATE  = 200;
@@ -289,13 +289,7 @@ export default function ExperienceDetailScreen() {
                 <Text style={[styles.accordionText, { color: colors.nomad.primary }]}>{location.phone}</Text>
               </TouchableOpacity>
             ) : null}
-            {location.website ? (
-              <TouchableOpacity style={styles.contactRow} onPress={() => location.website && Linking.openURL(location.website)}>
-                <Ionicons name="globe-outline" size={15} color={colors.nomad.onSurfaceVariant} />
-                <Text style={[styles.accordionText, { color: colors.nomad.primary }]} numberOfLines={1}>{location.website}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {!location.address && !location.phone && !location.website && (
+            {!location.address && !location.phone && (
               <Text style={styles.accordionText}>Chưa có thông tin liên hệ</Text>
             )}
           </View>
@@ -493,7 +487,7 @@ const styles = StyleSheet.create({
   expMiniImg:           { width: 52, height: 52, borderRadius: radius.md, resizeMode: 'cover' },
   expMiniTitle:         { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurface },
   expMiniLoc:           { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
-  errorBox:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
+  errorBox:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.error + '14', borderRadius: radius.md, padding: 10, marginBottom: spacing.md },
   errorText:            { flex: 1, color: colors.error, fontSize: 12 },
   stepLabel:            { fontSize: 12, fontWeight: '700', color: colors.nomad.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   noTrips:              { alignItems: 'center', paddingVertical: spacing.lg, gap: 8 },
@@ -518,7 +512,7 @@ const styles = StyleSheet.create({
 
   // Bookmark sheet
   bmOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  bmSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: spacing.lg, paddingBottom: 32 },
+  bmSheet:      { backgroundColor: colors.nomad.surfaceContainerLow, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: spacing.lg, paddingBottom: 32 },
   bmHandle:     { width: 40, height: 4, backgroundColor: colors.nomad.outlineVariant, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
   bmSheetTitle: { fontSize: 16, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: spacing.md },
   bmItem:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },

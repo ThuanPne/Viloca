@@ -226,6 +226,6 @@ const styles = StyleSheet.create({
   menuRight:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   menuValue:     { fontSize: 12, color: colors.nomad.onSurfaceVariant },
   signOutSection:{ margin: spacing.lg },
-  signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', paddingVertical: 14, borderRadius: radius.lg },
+  signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.error + '14', paddingVertical: 14, borderRadius: radius.lg },
   signOutText:   { fontSize: 15, fontWeight: '600', color: colors.error },
 });

@@ -10,14 +10,14 @@ interface Props {
 }
 
 const bg: Record<Color, string> = {
-  terracotta: colors.primary100,
-  forest:     colors.secondary100,
-  neutral:    colors.border,
+  terracotta: colors.nomad.secondaryContainer,
+  forest:     colors.nomad.onPrimaryContainer,
+  neutral:    colors.nomad.surfaceContainer,
 };
 const text: Record<Color, string> = {
-  terracotta: colors.primary600,
-  forest:     colors.secondary600,
-  neutral:    colors.textMuted,
+  terracotta: colors.nomad.primary,
+  forest:     colors.nomad.primaryContainer,
+  neutral:    colors.nomad.onSurfaceVariant,
 };
 
 export function Tag({ label, color = 'neutral' }: Props) {

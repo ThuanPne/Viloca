@@ -9,6 +9,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { colors } from '@/src/theme/colors';
 
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 5;
@@ -37,23 +38,23 @@ export default function AgeSelectScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 px-6">
-        <View className="pt-10 pb-8">
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.nomad.background }}>
+      <View style={{ flex: 1, paddingHorizontal: 24 }}>
+        <View style={{ paddingTop: 40, paddingBottom: 32 }}>
           <TouchableOpacity
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
+            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.nomad.surfaceContainer }}
             onPress={() => router.back()}
           >
-            <Text className="text-gray-600 text-lg">←</Text>
+            <Text style={{ color: colors.nomad.onSurfaceVariant, fontSize: 18 }}>←</Text>
           </TouchableOpacity>
         </View>
 
         <View className="items-center mb-10">
-          <View className="w-16 h-16 bg-blue-500 rounded-2xl items-center justify-center mb-4">
-            <Text className="text-white text-3xl font-bold">V</Text>
+          <View style={{ width: 64, height: 64, backgroundColor: colors.nomad.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Text style={{ color: colors.nomad.onPrimary, fontSize: 30, fontWeight: 'bold' }}>V</Text>
           </View>
-          <Text className="text-2xl font-bold text-gray-900">Độ tuổi của bạn?</Text>
-          <Text className="text-gray-400 text-sm mt-2 text-center">
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.nomad.onSurface }}>Độ tuổi của bạn?</Text>
+          <Text style={{ color: colors.nomad.onSurfaceVariant, fontSize: 14, marginTop: 8, textAlign: 'center' }}>
             Giúp chúng tôi gợi ý hành trình phù hợp hơn
           </Text>
         </View>
@@ -82,7 +83,7 @@ export default function AgeSelectScreen() {
                 left: 0, right: 0,
                 height: ITEM_HEIGHT,
                 borderTopWidth: 2, borderBottomWidth: 2,
-                borderColor: '#3b82f6',
+                borderColor: colors.nomad.primary,
                 zIndex: 10,
               }}
             />
@@ -133,7 +134,7 @@ export default function AgeSelectScreen() {
                       transform: [{ scale }],
                     }}
                   >
-                    <Text style={{ fontSize: 26, fontWeight: '700', color: '#1e293b' }}>
+                    <Text style={{ fontSize: 26, fontWeight: '700', color: colors.nomad.onSurface }}>
                       {age}
                     </Text>
                   </Animated.View>
@@ -142,21 +143,21 @@ export default function AgeSelectScreen() {
             </Animated.ScrollView>
           </View>
 
-          <Text className="text-gray-400 text-sm mt-2">tuổi</Text>
+          <Text style={{ color: colors.nomad.onSurfaceVariant, fontSize: 14, marginTop: 8 }}>tuổi</Text>
         </View>
 
         <TouchableOpacity
-          className="py-4 rounded-2xl items-center mb-4 bg-blue-500"
+          style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginBottom: 16, backgroundColor: colors.nomad.primary }}
           onPress={handleContinue}
           activeOpacity={0.8}
         >
-          <Text className="text-white font-semibold text-base">Tiếp tục</Text>
+          <Text style={{ color: colors.nomad.onPrimary, fontWeight: '600', fontSize: 16 }}>Tiếp tục</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => router.push({ pathname: '/(auth)/register', params: { name: name ?? '' } })}
         >
-          <Text className="text-gray-400 text-sm text-center">Bỏ qua</Text>
+          <Text style={{ color: colors.nomad.onSurfaceVariant, fontSize: 14, textAlign: 'center' }}>Bỏ qua</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

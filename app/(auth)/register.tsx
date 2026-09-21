@@ -6,7 +6,7 @@ import {
 import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '@/lib/supabase';
+import supabase from '@/src/lib/supabase';
 import { colors } from '@/src/theme/colors';
 
 const c = colors.nomad;
@@ -42,11 +42,11 @@ function validateEmail(email: string): boolean {
 }
 
 const STRENGTH_CONFIG = [
-  { label: 'Yếu',      color: '#DC2626' },
-  { label: 'Yếu',      color: '#DC2626' },
-  { label: 'Trung bình', color: '#F97316' },
-  { label: 'Mạnh',     color: '#EAB308' },
-  { label: 'Rất mạnh', color: '#16A34A' },
+  { label: 'Yếu',        color: colors.error },
+  { label: 'Yếu',        color: colors.error },
+  { label: 'Trung bình', color: colors.warning },
+  { label: 'Mạnh',       color: '#EAB308' },
+  { label: 'Rất mạnh',   color: colors.success },
 ];
 
 const CONDITION_LABELS = [
@@ -252,9 +252,9 @@ export default function RegisterScreen() {
                         <Ionicons
                           name={conditions[key] ? 'checkmark-circle' : 'close-circle-outline'}
                           size={14}
-                          color={conditions[key] ? '#16A34A' : c.outlineVariant}
+                          color={conditions[key] ? colors.success : c.outlineVariant}
                         />
-                        <Text style={[styles.conditionText, { color: conditions[key] ? '#16A34A' : c.onSurfaceVariant }]}>
+                        <Text style={[styles.conditionText, { color: conditions[key] ? colors.success : c.onSurfaceVariant }]}>
                           {label}
                         </Text>
                       </View>
@@ -370,11 +370,11 @@ const styles = StyleSheet.create({
     backgroundColor: c.surfaceContainerLow,
     borderRadius: 12, borderWidth: 1, borderColor: 'transparent', overflow: 'hidden',
   },
-  inputRowError: { borderColor: '#DC2626' },
+  inputRowError: { borderColor: colors.error },
   inputIcon: { marginLeft: 16, marginRight: 4 },
   input: { flex: 1, fontSize: 16, color: c.onSurface, paddingHorizontal: 12, paddingVertical: 16 },
   eyeBtn: { paddingHorizontal: 16, paddingVertical: 16 },
-  fieldError: { fontSize: 12, color: '#DC2626', marginLeft: 4 },
+  fieldError: { fontSize: 12, color: colors.error, marginLeft: 4 },
 
   strengthWrap: { marginTop: 10, gap: 6 },
   strengthBars: { flexDirection: 'row', gap: 4 },

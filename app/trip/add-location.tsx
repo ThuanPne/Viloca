@@ -316,12 +316,12 @@ const styles = StyleSheet.create({
 
   timeChip:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, borderWidth: 1.5, borderColor: N.outlineVariant, backgroundColor: N.surfaceContainerLow },
   timeChipActive:    { backgroundColor: N.primary, borderColor: N.primary },
-  timeChipTaken:     { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', opacity: 0.6 },
+  timeChipTaken:     { backgroundColor: colors.error + '14', borderColor: colors.error + '60', opacity: 0.6 },
   timeChipText:      { fontSize: 13, fontWeight: '500', color: N.onSurfaceVariant },
   timeChipTextActive:{ color: '#fff', fontWeight: '700' },
   timeChipTakenText: { color: colors.error },
 
-  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: '#FCA5A5' },
+  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.error + '14', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: colors.error + '60' },
   errorText: { flex: 1, color: colors.error, fontSize: 13 },
 
   footer:     { paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: N.outlineVariant, backgroundColor: N.background },
@@ -329,13 +329,13 @@ const styles = StyleSheet.create({
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   warnOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  warnBox:        { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 12 },
-  warnIconWrap:   { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  warnBox:        { backgroundColor: N.surfaceContainerLow, borderRadius: 20, padding: 24, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 12 },
+  warnIconWrap:   { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.warning + '28', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   warnTitle:      { fontSize: 17, fontWeight: '800', color: N.onSurface, marginBottom: 8, textAlign: 'center' },
   warnMessage:    { fontSize: 14, color: N.onSurfaceVariant, lineHeight: 21, textAlign: 'center', marginBottom: 20 },
   warnActions:    { flexDirection: 'row', gap: 10, width: '100%' },
   warnCancelBtn:  { flex: 1, paddingVertical: 13, borderRadius: radius.lg, borderWidth: 1, borderColor: N.outlineVariant, alignItems: 'center' },
   warnCancelText: { fontSize: 14, fontWeight: '600', color: N.onSurfaceVariant },
-  warnConfirmBtn: { flex: 1, paddingVertical: 13, borderRadius: radius.lg, backgroundColor: '#F59E0B', alignItems: 'center' },
+  warnConfirmBtn: { flex: 1, paddingVertical: 13, borderRadius: radius.lg, backgroundColor: colors.warning, alignItems: 'center' },
   warnConfirmText:{ fontSize: 14, fontWeight: '700', color: '#fff' },
 });
