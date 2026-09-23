@@ -86,6 +86,8 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen name="profile/edit" options={{ href: null }} />
+      <Tabs.Screen name="profile/posts" options={{ href: null }} />
+      <Tabs.Screen name="profile/trips" options={{ href: null }} />
     </Tabs>
   );
 }

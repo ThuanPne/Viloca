@@ -1,29 +1,6 @@
 export type ExperienceCategory = 'food_tour' | 'workshop' | 'trekking' | 'cultural';
 export type PlaceRegion = 'north' | 'central' | 'south';
 
-export interface Location {
-  id: string;
-  city: string | null;
-  name: string;
-  district: string | null;
-  address: string | null;
-  google_maps_url: string | null;
-  category: string | null;
-  style_tag: string | null;
-  price_level: number | null;
-  opening_hours: string | null;
-  closing_hours: string | null;
-  off_days: string | null;
-  phone: string | null;
-  short_description: string | null;
-  long_description: string | null;
-  photos: string | null;
-  verified: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 /** @deprecated Use Location instead */
 export interface Place {
   id: string;
@@ -74,6 +51,8 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   travel_style: string[];
+  plan: 'free' | 'pro';
+  ai_credits_remaining: number;
   created_at: string;
 }
 
@@ -113,7 +92,6 @@ export interface TripItem {
     category: string | null;
     hint: string | null;
     short_description: string | null;
-    long_description: string | null;
     cover_image: string | null;
     photos: string | null;
     district: string | null;
@@ -128,27 +106,46 @@ export interface TripItem {
 
 export interface Location {
   id: string;
+  // Core / free-tier fields
   name: string;
   category: string;
   vibes: string[];
   hint: string | null;
-  short_description: string | null;
-  long_description: string | null;
-  description: string | null;
   cover_image: string | null;
   images: string[];
   price_per_person: number;
   duration_minutes: number;
   rating: number | null;
+  // Premium fields
   address: string | null;
-  district: string | null;
-  city: string | null;
   coordinates: { lat: number; lng: number } | null;
+  // Extended metadata (from enrich migration)
+  city: string | null;
+  district: string | null;
+  google_maps_url: string | null;
+  style_tag: string | null;
+  price_level: number | null;
   opening_hours: string | null;
+  closing_hours: string | null;
+  off_days: string | null;
   phone: string | null;
-  website: string | null;
+  short_description: string | null;
+  photos: string | null;
+  verified: boolean;
+  is_featured: boolean;
+  // Admin / internal fields
+  description: string | null;
+  hint_generated_at: string | null;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  emoji: string | null;
+  sort_order: number;
 }
 
 export type BookmarkStatus = 'want' | 'planned' | 'done';
@@ -195,6 +192,7 @@ export interface Post {
   updated_at: string;
   profiles?: { full_name: string | null; avatar_url: string | null } | null;
   post_likes?: { user_id: string }[];
+  post_saves?: { user_id: string }[];
 }
 
 export interface PostComment {

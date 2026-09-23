@@ -14,56 +14,6 @@ import type { Post } from '@/src/types';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PAGE_SIZE = 10;
 
-// ─── Mock stories ────────────────────────────────────────────────────────────
-
-type Story = { id: string; user: string; avatarSeed: string; isAdd?: boolean; isReel?: boolean };
-
-const MOCK_STORIES: Story[] = [
-  { id: '0', user: 'Bạn',    avatarSeed: 'me',      isAdd: true },
-  { id: '1', user: 'Lan Anh', avatarSeed: 'lananh',  isReel: true },
-  { id: '2', user: 'Minh Tú', avatarSeed: 'minhtu' },
-  { id: '3', user: 'Hương',   avatarSeed: 'huong',   isReel: true },
-  { id: '4', user: 'Đức Nam', avatarSeed: 'ducnam' },
-  { id: '5', user: 'Phương',  avatarSeed: 'phuong',  isReel: true },
-];
-
-// ─── Mock posts (fallback khi DB chưa có data) ───────────────────────────────
-
-const MOCK_POSTS: Post[] = [
-  {
-    id: 'mock-1', user_id: 'mock', content: 'Hội An buổi tối thật sự ma mị 🏮 Đèn lồng rực rỡ khắp phố, ngồi cà phê bên sông nghe nhạc acoustic mà không muốn về. Ai chưa đến thì phải đến một lần nhé!',
-    images: ['https://picsum.photos/seed/hoian1/800/600', 'https://picsum.photos/seed/hoian2/800/600'],
-    location_id: null, trip_id: null, likes_count: 84, comments_count: 17,
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(), updated_at: new Date().toISOString(),
-    profiles: { full_name: 'Lan Anh', avatar_url: 'https://api.dicebear.com/7.x/avataaars/png?seed=lananh' },
-    post_likes: [],
-  },
-  {
-    id: 'mock-2', user_id: 'mock', content: '🎬 Ngủ trên thuyền giữa vịnh Hạ Long — trải nghiệm không thể quên trong đời. Sáng dậy mở cửa cabin là thấy ngay cảnh này 🌊',
-    images: ['https://picsum.photos/seed/halong1/800/600'],
-    location_id: null, trip_id: null, likes_count: 201, comments_count: 43,
-    created_at: new Date(Date.now() - 5 * 3600000).toISOString(), updated_at: new Date().toISOString(),
-    profiles: { full_name: 'Minh Tú', avatar_url: 'https://api.dicebear.com/7.x/avataaars/png?seed=minhtu' },
-    post_likes: [],
-  },
-  {
-    id: 'mock-3', user_id: 'mock', content: 'Ai mà không biết Cầu Vàng thì phải biết ngay 😂 Thật ra cầu đẹp thật, chỉ tội đông khách quá. Tip: đến sớm khoảng 7h sáng sẽ vắng hơn nhiều!',
-    images: ['https://picsum.photos/seed/danang1/800/600', 'https://picsum.photos/seed/danang2/800/600', 'https://picsum.photos/seed/danang3/800/600'],
-    location_id: null, trip_id: null, likes_count: 136, comments_count: 29,
-    created_at: new Date(Date.now() - 24 * 3600000).toISOString(), updated_at: new Date().toISOString(),
-    profiles: { full_name: 'Hương Giang', avatar_url: 'https://api.dicebear.com/7.x/avataaars/png?seed=huong' },
-    post_likes: [],
-  },
-  {
-    id: 'mock-4', user_id: 'mock', content: 'Cuối tuần Hà Nội đông vui lắm 🍃 Bún chả Hàng Mành ăn xong đi bộ quanh hồ, ghé cà phê trứng nghe mưa rơi. Đó là Hà Nội của tôi.',
-    images: ['https://picsum.photos/seed/hanoi1/800/600'],
-    location_id: null, trip_id: null, likes_count: 57, comments_count: 8,
-    created_at: new Date(Date.now() - 48 * 3600000).toISOString(), updated_at: new Date().toISOString(),
-    profiles: { full_name: 'Đức Nam', avatar_url: 'https://api.dicebear.com/7.x/avataaars/png?seed=ducnam' },
-    post_likes: [],
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr: string): string {
@@ -72,36 +22,6 @@ function timeAgo(dateStr: string): string {
   if (diff < 3600)  return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return `${Math.floor(diff / 86400)} ngày trước`;
-}
-
-// ─── Story item ───────────────────────────────────────────────────────────────
-
-function StoryItem({ story }: { story: Story }) {
-  if (story.isAdd) {
-    return (
-      <TouchableOpacity style={s.storyWrap} activeOpacity={0.8} onPress={() => router.push('/post/create')}>
-        <View style={[s.storyRing, { borderColor: colors.nomad.outlineVariant }]}>
-          <View style={[s.storyImg, { backgroundColor: colors.nomad.surfaceContainer, alignItems: 'center', justifyContent: 'center' }]}>
-            <Ionicons name="add" size={28} color={colors.nomad.primary} />
-          </View>
-        </View>
-        <Text style={s.storyName} numberOfLines={1}>Thêm</Text>
-      </TouchableOpacity>
-    );
-  }
-  return (
-    <TouchableOpacity style={s.storyWrap} activeOpacity={0.8}>
-      <View style={[s.storyRing, story.isReel && { borderColor: colors.nomad.primary }]}>
-        <Image source={{ uri: `https://picsum.photos/seed/${story.avatarSeed}story/160/160` }} style={s.storyImg} />
-        {story.isReel && (
-          <View style={s.reelBadge}>
-            <Ionicons name="play" size={8} color="#fff" />
-          </View>
-        )}
-      </View>
-      <Text style={s.storyName} numberOfLines={1}>{story.user}</Text>
-    </TouchableOpacity>
-  );
 }
 
 // ─── Image carousel ───────────────────────────────────────────────────────────
@@ -145,14 +65,16 @@ function ImageCarousel({ images }: { images: string[] | null | undefined }) {
 
 // ─── Post card ────────────────────────────────────────────────────────────────
 
-function PostCard({ post, currentUserId, onLike, onDelete }: {
+function PostCard({ post, currentUserId, onLike, onSave, onDelete }: {
   post: Post;
   currentUserId?: string;
   onLike: (post: Post) => void;
+  onSave: (post: Post) => void;
   onDelete: (postId: string) => void;
 }) {
   const [showFull, setShowFull] = useState(false);
   const liked   = post.post_likes?.some((l) => l.user_id === currentUserId) ?? false;
+  const saved   = post.post_saves?.some((s) => s.user_id === currentUserId) ?? false;
   const isMock  = post.id.startsWith('mock-');
   const isOwn   = !isMock && post.user_id === currentUserId;
   const longText = (post.content?.length ?? 0) > 120;
@@ -209,8 +131,8 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
 
       <View style={s.postActions}>
         <TouchableOpacity style={s.actionBtn} onPress={() => onLike(post)} activeOpacity={0.7}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? '#EF4444' : colors.nomad.onSurfaceVariant} />
-          <Text style={[s.actionCount, liked && { color: '#EF4444' }]}>{post.likes_count}</Text>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? colors.error : colors.nomad.onSurfaceVariant} />
+          <Text style={[s.actionCount, liked && { color: colors.error }]}>{post.likes_count}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.actionBtn} onPress={() => !isMock && router.push(`/post/${post.id}`)} activeOpacity={0.7}>
           <Ionicons name="chatbubble-outline" size={21} color={colors.nomad.onSurfaceVariant} />
@@ -221,8 +143,12 @@ function PostCard({ post, currentUserId, onLike, onDelete }: {
           <Text style={s.actionCount}>Chia sẻ</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        <TouchableOpacity style={{ padding: 4 }}>
-          <Ionicons name="bookmark-outline" size={21} color={colors.nomad.onSurfaceVariant} />
+        <TouchableOpacity style={{ padding: 4 }} onPress={() => onSave(post)}>
+          <Ionicons
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={21}
+            color={saved ? colors.nomad.primary : colors.nomad.onSurfaceVariant}
+          />
         </TouchableOpacity>
       </View>
     </View>
@@ -247,7 +173,7 @@ export default function ExploreScreen() {
 
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, post_likes(user_id), post_comments(count)')
+      .select('*, post_likes(user_id), post_saves(user_id), post_comments(count)')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
@@ -282,10 +208,7 @@ export default function ExploreScreen() {
     fetchPosts(realPosts.length, true);
   }, [realPosts.length, hasMore, loadingMore]);
 
-  // Real posts on top, mock posts at bottom as filler
-  const displayPosts: Post[] = realPosts.length > 0
-    ? [...realPosts, ...MOCK_POSTS]
-    : MOCK_POSTS;
+  const displayPosts: Post[] = realPosts;
 
   async function handleLike(post: Post) {
     if (!user || post.id.startsWith('mock-')) return;
@@ -306,6 +229,36 @@ export default function ExploreScreen() {
           : [...(p.post_likes ?? []), { user_id: user.id }],
       };
     }));
+  }
+
+  async function handleSave(post: Post) {
+    if (!user || post.id.startsWith('mock-')) return;
+    const wasSaved = post.post_saves?.some((s) => s.user_id === user.id);
+    // Optimistic update first
+    setRealPosts((prev) => prev.map((p) => {
+      if (p.id !== post.id) return p;
+      return {
+        ...p,
+        post_saves: wasSaved
+          ? (p.post_saves ?? []).filter((s) => s.user_id !== user.id)
+          : [...(p.post_saves ?? []), { user_id: user.id }],
+      };
+    }));
+    const { error } = wasSaved
+      ? await supabase.from('post_saves').delete().eq('post_id', post.id).eq('user_id', user.id)
+      : await supabase.from('post_saves').insert({ post_id: post.id, user_id: user.id });
+    if (error) {
+      // Revert optimistic update on failure
+      setRealPosts((prev) => prev.map((p) => {
+        if (p.id !== post.id) return p;
+        return {
+          ...p,
+          post_saves: wasSaved
+            ? [...(p.post_saves ?? []), { user_id: user.id }]
+            : (p.post_saves ?? []).filter((s) => s.user_id !== user.id),
+        };
+      }));
+    }
   }
 
   async function handleDelete(postId: string) {
@@ -331,24 +284,14 @@ export default function ExploreScreen() {
         </TouchableOpacity>
         <View style={s.createDivider} />
         <TouchableOpacity style={s.createAction} onPress={() => router.push('/post/create')}>
-          <Ionicons name="videocam-outline" size={18} color="#EF4444" />
-          <Text style={[s.createActionText, { color: '#EF4444' }]}>Reels</Text>
+          <Ionicons name="videocam-outline" size={18} color={colors.error} />
+          <Text style={[s.createActionText, { color: colors.error }]}>Reels</Text>
         </TouchableOpacity>
         <View style={s.createDivider} />
         <TouchableOpacity style={s.createAction} onPress={() => router.push('/post/create')}>
-          <Ionicons name="location-outline" size={18} color="#F59E0B" />
-          <Text style={[s.createActionText, { color: '#F59E0B' }]}>Địa điểm</Text>
+          <Ionicons name="location-outline" size={18} color={colors.warning} />
+          <Text style={[s.createActionText, { color: colors.warning }]}>Địa điểm</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={s.sectionDivider} />
-
-      {/* Stories / Reels */}
-      <View style={s.storiesSection}>
-        <Text style={s.storiesTitle}>Reels & Stories</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}>
-          {MOCK_STORIES.map((story) => <StoryItem key={story.id} story={story} />)}
-        </ScrollView>
       </View>
 
       <View style={s.sectionDivider} />
@@ -361,6 +304,16 @@ export default function ExploreScreen() {
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
+      {/* Background decoration */}
+      <View style={s.blobTopRight}   pointerEvents="none" />
+      <View style={s.blobBottomLeft} pointerEvents="none" />
+      <Image
+        source={require('@/assets/viloca-logo.png')}
+        style={s.watermark}
+        resizeMode="contain"
+        pointerEvents="none"
+      />
+
       <View style={s.header}>
         <Text style={s.headerTitle}>Khám phá</Text>
         <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -376,8 +329,15 @@ export default function ExploreScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => <PostCard post={item} currentUserId={user?.id} onLike={handleLike} onDelete={handleDelete} />}
+        renderItem={({ item }) => <PostCard post={item} currentUserId={user?.id} onLike={handleLike} onSave={handleSave} onDelete={handleDelete} />}
         ItemSeparatorComponent={() => <View style={s.postDivider} />}
+        ListEmptyComponent={!loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 48, gap: 8 }}>
+            <Ionicons name="newspaper-outline" size={40} color={colors.nomad.outlineVariant} />
+            <Text style={{ fontSize: 14, color: colors.nomad.onSurfaceVariant }}>Chưa có bài viết nào</Text>
+            <Text style={{ fontSize: 12, color: colors.nomad.outlineVariant }}>Hãy là người đầu tiên chia sẻ!</Text>
+          </View>
+        ) : null}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={colors.nomad.primary} /> : null}
         refreshControl={
           <RefreshControl
@@ -395,7 +355,10 @@ export default function ExploreScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: colors.nomad.background },
+  screen:       { flex: 1, backgroundColor: colors.nomad.background, overflow: 'hidden' },
+  blobTopRight:   { position: 'absolute', top: -60, right: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: colors.nomad.secondaryContainer, opacity: 0.28 },
+  blobBottomLeft: { position: 'absolute', bottom: 60, left: -50, width: 160, height: 160, borderRadius: 80, backgroundColor: colors.nomad.primary, opacity: 0.07 },
+  watermark:      { position: 'absolute', bottom: 24, right: 20, width: 88, height: 88, opacity: 0.05 },
 
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -415,13 +378,6 @@ const s = StyleSheet.create({
   createDivider: { width: StyleSheet.hairlineWidth, height: 20, backgroundColor: colors.nomad.outlineVariant },
   sectionDivider: { height: 8, backgroundColor: colors.nomad.surfaceContainer },
 
-  storiesSection: { backgroundColor: colors.nomad.background, paddingTop: 12 },
-  storiesTitle:   { fontSize: 13, fontWeight: '700', color: colors.nomad.onSurfaceVariant, paddingHorizontal: 16, marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' },
-  storyWrap:      { alignItems: 'center', width: 68 },
-  storyRing:      { width: 64, height: 64, borderRadius: 32, borderWidth: 2.5, borderColor: colors.nomad.outlineVariant, padding: 2, marginBottom: 5 },
-  storyImg:       { width: '100%', height: '100%', borderRadius: 28 },
-  storyName:      { fontSize: 11, color: colors.nomad.onSurfaceVariant, textAlign: 'center' },
-  reelBadge:      { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.nomad.primary, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.nomad.background },
 
   postCard:    { backgroundColor: colors.nomad.background },
   postDivider: { height: 8, backgroundColor: colors.nomad.surfaceContainer },

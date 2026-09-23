@@ -2,18 +2,12 @@ import { useEffect, useRef, memo } from 'react';
 import { Animated, Image, StyleSheet } from 'react-native';
 import type { MascotEmotion } from '@/types/mascot';
 
-const SOURCES: Partial<Record<MascotEmotion, ReturnType<typeof require>>> = {
+const SOURCES: Record<MascotEmotion, ReturnType<typeof require>> = {
   idle:      require('@/assets/mascot/sen-idle.png'),
   happy:     require('@/assets/mascot/sen-happy.png'),
   excited:   require('@/assets/mascot/sen-excited.png'),
-  thinking:  require('@/assets/mascot/sen-thinking.png'),
-  surprised: require('@/assets/mascot/sen-surprised.png'),
-  love:      require('@/assets/mascot/sen-love.png'),
-  winking:   require('@/assets/mascot/sen-winking.png'),
   exploring: require('@/assets/mascot/sen-exploring.png'),
 };
-
-const FALLBACK = require('@/assets/mascot/sen-happy.png');
 
 interface Props {
   emotion?: MascotEmotion;
@@ -40,7 +34,7 @@ function MascotAvatar({ emotion = 'happy', size = 100 }: Props) {
       ]}
     >
       <Image
-        source={SOURCES[emotion] ?? FALLBACK}
+        source={SOURCES[emotion]}
         style={styles.image}
         resizeMode="contain"
       />

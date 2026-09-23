@@ -23,6 +23,6 @@ export function SectionHeader({ title, actionLabel, onAction }: Props) {
 
 const styles = StyleSheet.create({
   row:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  title:  { fontSize: 11, fontWeight: '600', color: colors.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
-  action: { fontSize: 13, fontWeight: '500', color: colors.primary600 },
+  title:  { fontSize: 11, fontWeight: '600', color: colors.nomad.onSurfaceVariant, letterSpacing: 0.8, textTransform: 'uppercase' },
+  action: { fontSize: 13, fontWeight: '500', color: colors.nomad.primary },
 });

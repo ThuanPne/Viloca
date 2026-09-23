@@ -15,6 +15,8 @@ import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { DatePicker } from '@/src/components/ui/DatePicker';
 import supabase from '@/src/lib/supabase';
+import { getCoverForDestination } from '@/src/lib/destination-covers';
+import { suggestTime, tripDayCount, dayLabel, formatDate, buildGoogleMapsUrl } from '@/src/lib/trip-utils';
 import type { Trip, TripItem, TripJournal, TimeSlot, TripStatus } from '@/src/types';
 import * as Location from 'expo-location';
 
@@ -162,6 +164,16 @@ else{
       });
   }
 }
+// Inject user location từ React Native sau khi GPS xong
+window.addUserLocation = function(lat, lng) {
+  if (window._userMarker) { window._userMarker.setLatLng([lat, lng]); return; }
+  var udIcon = L.divIcon({
+    html: '<div class="user-dot-wrap"><div class="user-pulse"><\/div><div class="user-dot"><\/div><\/div>',
+    className: '', iconSize: [20, 20], iconAnchor: [10, 10]
+  });
+  window._userMarker = L.marker([lat, lng], {icon: udIcon, zIndexOffset: -100})
+    .addTo(map).bindPopup('<b>Vị trí của bạn<\/b>');
+};
 <\/script>
 </body>
 </html>`;
@@ -191,6 +203,9 @@ const MOOD_OPTIONS: { value: 'great' | 'good' | 'okay' | 'tired'; icon: string; 
 const MOOD_ICONS: Record<string, string> = {
   great: '😄', good: '😊', okay: '😐', tired: '😴',
 };
+const MOOD_COLORS: Record<string, string> = {
+  great: '#4CAF50', good: '#42A5F5', okay: '#FFA726', tired: '#90A4AE',
+};
 const TIME_SLOTS: { value: TimeSlot; label: string; icon: string }[] = [
   { value: 'morning',   label: 'Sáng',  icon: '🌅' },
   { value: 'afternoon', label: 'Chiều', icon: '☀️' },
@@ -200,38 +215,14 @@ const CATEGORY_LABEL: Record<string, string> = {
   food_tour: 'Ẩm thực', workshop: 'Workshop', trekking: 'Thiên nhiên', cultural: 'Văn hóa',
 };
 
-const SLOT_BASE_MIN: Record<string, number> = { morning: 7 * 60, afternoon: 13 * 60, evening: 18 * 60 };
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function suggestTime(slot: string, slotIndex: number): string {
-  const total = (SLOT_BASE_MIN[slot] ?? 7 * 60) + slotIndex * 90;
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function dayLabel(trip: Trip, dayNum: number): string {
-  if (!trip.start_date) return `Ngày ${dayNum}`;
+function journalDateLabel(trip: Trip, dayNum: number): string {
+  if (!trip.start_date) return '';
   const d = new Date(trip.start_date);
   d.setDate(d.getDate() + dayNum - 1);
-  return `Ngày ${dayNum} · ${d.getDate()}/${d.getMonth() + 1}`;
-}
-
-function tripDayCount(trip: Trip): number {
-  if (trip.start_date && trip.end_date) {
-    const diff = Math.ceil(
-      (new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / 86400000
-    ) + 1;
-    return Math.max(1, Math.min(diff, 30));
-  }
-  return 0;
-}
-
-function formatDate(iso: string) {
-  if (!iso) return '—';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+  const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  return `${weekdays[d.getDay()]} · ${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 // ─── Sortable Day List ────────────────────────────────────────────────────────
@@ -288,7 +279,7 @@ function CardInner({ item }: { item: TripItem }) {
         </View>
         {displayLoc && (
           <View style={styles.cardLocRow}>
-            <Ionicons name="location-outline" size={11} color={colors.textMuted} />
+            <Ionicons name="location-outline" size={11} color={colors.nomad.onSurfaceVariant} />
             <Text style={styles.timelineCardLoc} numberOfLines={1}>{displayLoc}</Text>
           </View>
         )}
@@ -490,7 +481,7 @@ function SortableDayItems({ items, editMode, checkedIds, onToggleCheck, onReorde
               ) : (
                 <View style={styles.dragHandle}>
                   <Ionicons name="reorder-two-outline" size={20}
-                    color={activeId === item.id ? colors.nomad.primary : colors.border} />
+                    color={activeId === item.id ? colors.nomad.primary : colors.nomad.outlineVariant} />
                 </View>
               )}
               <View style={styles.timelineTimeCol}>
@@ -545,10 +536,11 @@ export default function TripDetailScreen() {
   const [loading, setLoading]   = useState(true);
 
   // Journal
-  const [journalDay, setJournalDay]       = useState(1);
+  const [journalDay, setJournalDay]         = useState(1);
   const [journalContent, setJournalContent] = useState('');
-  const [journalMood, setJournalMood]     = useState<'great' | 'good' | 'okay' | 'tired' | null>(null);
-  const [saving, setSaving]               = useState(false);
+  const [journalMood, setJournalMood]       = useState<'great' | 'good' | 'okay' | 'tired' | null>(null);
+  const [saving, setSaving]                 = useState(false);
+  const [showJournalModal, setShowJournalModal] = useState(false);
 
   // Date modal
   const [showDateModal, setShowDateModal] = useState(false);
@@ -578,10 +570,12 @@ export default function TripDetailScreen() {
 
   // Scroll
   const scrollY = useRef(new Animated.Value(0)).current;
-  const COVER_MAX = 220;
+  const COVER_MAX = 260;
   const COVER_MIN = 72;
-  const coverHeight  = scrollY.interpolate({ inputRange: [0, COVER_MAX - COVER_MIN], outputRange: [COVER_MAX, COVER_MIN], extrapolate: 'clamp' });
-  const coverOpacity = scrollY.interpolate({ inputRange: [0, COVER_MAX - COVER_MIN], outputRange: [1, 0.45], extrapolate: 'clamp' });
+  const coverHeight    = scrollY.interpolate({ inputRange: [0, COVER_MAX - COVER_MIN], outputRange: [COVER_MAX, COVER_MIN], extrapolate: 'clamp' });
+  const heroOpacity    = scrollY.interpolate({ inputRange: [0, 80], outputRange: [1, 0], extrapolate: 'clamp' });
+  const navbarBgOp     = scrollY.interpolate({ inputRange: [60, 120], outputRange: [0, 1], extrapolate: 'clamp' });
+  const navbarTitleOp  = scrollY.interpolate({ inputRange: [80, 140], outputRange: [0, 1], extrapolate: 'clamp' });
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -589,10 +583,12 @@ export default function TripDetailScreen() {
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
 
   // Map modal
-  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapModalVisible, setMapModalVisible]   = useState(false);
   const [mapWebViewLoading, setMapWebViewLoading] = useState(true);
-  const [mapDay, setMapDay] = useState(1);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapLocating, setMapLocating]           = useState(false);
+  const [mapDay, setMapDay]                     = useState(1);
+  const [userLocation, setUserLocation]         = useState<{ lat: number; lng: number } | null>(null);
+  const mapWebViewRef = useRef<any>(null);
 
 
   // Edit trip modal
@@ -607,7 +603,7 @@ export default function TripDetailScreen() {
     Promise.all([
       supabase.from('trips').select('*').eq('id', id).single(),
       supabase.from('trip_items')
-        .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
+        .select('*, locations(name, category, hint, short_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
         .eq('trip_id', id)
         .order('day_number')
         .order('sort_order'),
@@ -638,6 +634,14 @@ export default function TripDetailScreen() {
   }
 
   // ── Journal ───────────────────────────────────────────────────────────────────
+
+  function openJournalModal(day: number) {
+    setJournalDay(day);
+    const existing = journals.find(j => j.day_number === day);
+    setJournalContent(existing?.content ?? '');
+    setJournalMood(existing?.mood ?? null);
+    setShowJournalModal(true);
+  }
 
   async function saveJournal() {
     if (!id || !journalContent.trim()) return;
@@ -678,15 +682,22 @@ export default function TripDetailScreen() {
 
     if (fnErr || !plan?.days) {
       let detail = fnErr?.message ?? plan?.error ?? JSON.stringify(plan);
-      if (fnErr?.context) {
-        try { const b = await (fnErr.context as Response).json(); detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b); } catch {}
+      const httpStatus = (fnErr as any)?.context?.status;
+      let isOutOfCredits = httpStatus === 402 || plan?.error === 'No AI credits remaining';
+      if (!isOutOfCredits && fnErr?.context) {
+        try {
+          const b = await (fnErr.context as Response).json();
+          isOutOfCredits = b?.error === 'No AI credits remaining';
+          detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b);
+        } catch {}
       }
-      setAiLog(`✗ ${detail}`);
+      setAiLog(isOutOfCredits ? '⚠ Hết lượt giúp đỡ miễn phí. Nâng cấp Pro để tiếp tục.' : `✗ ${detail}`);
       setAiGenerating(false);
       return;
     }
 
-    setAiLog(`✓ AI đã lên ${plan.days.length} ngày, đang lưu...`);
+    const creditsMsg = plan.credits_remaining != null ? ` — còn ${plan.credits_remaining} lượt` : '';
+    setAiLog(`✓ AI đã lên ${plan.days.length} ngày, đang lưu...${creditsMsg}`);
     const slotMap: Record<string, 'morning' | 'afternoon' | 'evening'> = {
       'sáng': 'morning', 'chiều': 'afternoon', 'tối': 'evening',
     };
@@ -708,7 +719,7 @@ export default function TripDetailScreen() {
 
     const { data: refreshed } = await supabase
       .from('trip_items')
-      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
+      .select('*, locations(name, category, hint, short_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours)')
       .eq('trip_id', id)
       .order('day_number')
       .order('sort_order');
@@ -720,11 +731,20 @@ export default function TripDetailScreen() {
 
   // ── Add location ──────────────────────────────────────────────────────────────
 
+  // Inject user dot khi GPS xong (sau khi WebView đã sẵn sàng)
+  useEffect(() => {
+    if (userLocation && !mapWebViewLoading && mapWebViewRef.current) {
+      mapWebViewRef.current.injectJavaScript(
+        `if(typeof window.addUserLocation==='function'){window.addUserLocation(${userLocation.lat},${userLocation.lng});}; true;`
+      );
+    }
+  }, [userLocation, mapWebViewLoading]);
+
   // Refresh items khi quay về từ add-location page
   useFocusEffect(useCallback(() => {
     if (!id) return;
     supabase.from('trip_items')
-      .select('*, locations(name, category, hint, short_description, long_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
+      .select('*, locations(name, category, hint, short_description, cover_image, photos, district, address, price_per_person, duration_minutes, rating, opening_hours, coordinates)')
       .eq('trip_id', id)
       .order('day_number').order('sort_order')
       .then(({ data }) => { if (data) setItems(data); });
@@ -737,6 +757,49 @@ export default function TripDetailScreen() {
   async function removeItem(itemId: string) {
     await supabase.from('trip_items').delete().eq('id', itemId);
     setItems((prev) => prev.filter((i) => i.id !== itemId));
+  }
+
+  async function updateItemSlot(itemId: string, newSlot: TimeSlot) {
+    const SLOT_ORDER: Record<TimeSlot, number> = { morning: 0, afternoon: 1, evening: 2 };
+
+    setItems(prev => {
+      // Apply new slot to the target item
+      const updated = prev.map(i => i.id === itemId ? { ...i, time_slot: newSlot } : i);
+
+      // Find which day this item belongs to
+      const dayNum = updated.find(i => i.id === itemId)?.day_number;
+      if (dayNum == null) return updated;
+
+      // Re-sort that day's items by slot order, preserving relative order within same slot
+      const otherDays = updated.filter(i => i.day_number !== dayNum);
+      const dayItems = updated
+        .filter(i => i.day_number === dayNum)
+        .sort((a, b) => SLOT_ORDER[a.time_slot] - SLOT_ORDER[b.time_slot] || a.sort_order - b.sort_order);
+
+      // Reassign sort_order + recalculate visit_time for items without manual time
+      const slotCounts: Record<string, number> = {};
+      const reordered = dayItems.map((item, idx) => {
+        const slotIdx = slotCounts[item.time_slot] ?? 0;
+        slotCounts[item.time_slot] = slotIdx + 1;
+        return {
+          ...item,
+          sort_order: idx,
+          visit_time: item.visit_time ? item.visit_time : suggestTime(item.time_slot, slotIdx),
+        };
+      });
+
+      // Persist all changed items in background
+      void Promise.all(reordered.map(item =>
+        supabase.from('trip_items').update({ sort_order: item.sort_order, time_slot: item.time_slot, visit_time: item.visit_time }).eq('id', item.id)
+      ));
+
+      setSelectedItem(prev => {
+        if (!prev || prev.id !== itemId) return prev;
+        return reordered.find(i => i.id === itemId) ?? prev;
+      });
+
+      return [...otherDays, ...reordered].sort((a, b) => a.day_number - b.day_number || a.sort_order - b.sort_order);
+    });
   }
 
   // ── Reorder (drag-and-drop) ───────────────────────────────────────────────────
@@ -837,45 +900,26 @@ export default function TripDetailScreen() {
 
   // ── Google Maps deep-link ─────────────────────────────────────────────────────
 
-  function buildGoogleMapsUrl(dayItems: TripItem[]): string {
-    const sorted = [...dayItems].sort((a, b) => a.sort_order - b.sort_order);
-    const waypoints = sorted.map(item => {
-      const loc = item.locations as any;
-      if (loc?.coordinates?.lat && loc?.coordinates?.lng) {
-        return `${loc.coordinates.lat},${loc.coordinates.lng}`;
-      }
-      if (loc?.address) return encodeURIComponent(loc.address);
-      return null;
-    }).filter(Boolean) as string[];
-
-    if (waypoints.length === 0) return 'https://maps.google.com';
-    if (waypoints.length === 1) {
-      return `https://www.google.com/maps/search/?api=1&query=${waypoints[0]}`;
-    }
-    const origin      = waypoints[0];
-    const destination = waypoints[waypoints.length - 1];
-    const middle      = waypoints.slice(1, -1);
-    const waypointsParam = middle.length > 0 ? `&waypoints=${middle.join('|')}` : '';
-    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
-  }
-
   // ── Open map with location permission ────────────────────────────────────────
 
   async function openMapWithLocation(day: number) {
     setMapDay(day);
     setMapWebViewLoading(true);
+    setUserLocation(null);
+    setMapModalVisible(true);   // mở modal NGAY, không chờ GPS
+
+    setMapLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      } else {
-        setUserLocation(null);
       }
     } catch {
-      setUserLocation(null);
+      // GPS thất bại, map vẫn hiển thị bình thường không có user dot
+    } finally {
+      setMapLocating(false);
     }
-    setMapModalVisible(true);
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────────
@@ -922,7 +966,7 @@ export default function TripDetailScreen() {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.nomad.primary} /></View>;
   }
   if (!trip) {
-    return <View style={styles.center}><Text style={{ color: colors.textMuted }}>Trip không tìm thấy</Text></View>;
+    return <View style={styles.center}><Text style={{ color: colors.nomad.onSurfaceVariant }}>Trip không tìm thấy</Text></View>;
   }
 
   const itemsByDay: Record<number, TripItem[]> = {};
@@ -943,15 +987,15 @@ export default function TripDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Fixed navbar */}
+      {/* Fixed navbar — transparent → solid on scroll */}
       <View style={styles.navbar}>
+        <Animated.View style={[styles.navbarBg, { opacity: navbarBgOp }]} />
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.navbarInfo}>
+        <Animated.View style={[styles.navbarInfo, { opacity: navbarTitleOp }]}>
           <Text style={styles.navbarTitle} numberOfLines={1}>{trip.title}</Text>
-          <Badge label={STATUS_LABEL[trip.status]} color={STATUS_COLOR[trip.status]} />
-        </View>
+        </Animated.View>
         <TouchableOpacity style={styles.editNavBtn} onPress={openEditModal}>
           <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
         </TouchableOpacity>
@@ -963,19 +1007,28 @@ export default function TripDetailScreen() {
         scrollEnabled={!isDragging}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
       >
-        {/* Cover */}
-        <Animated.Image
-          source={{ uri: trip.cover_image ?? `https://picsum.photos/seed/trip-${trip.id}/800/400` }}
-          style={[styles.cover, { height: coverHeight, opacity: coverOpacity }]}
-        />
-
-        {/* Meta */}
-        <View style={styles.coverMeta}>
-          <Text style={styles.destination}>📍 {trip.destination}</Text>
-          {trip.start_date ? (
-            <Text style={styles.dates}>{formatDate(trip.start_date)} → {trip.end_date ? formatDate(trip.end_date) : '...'}</Text>
-          ) : null}
-        </View>
+        {/* Hero cover */}
+        <Animated.View style={[styles.coverWrap, { height: coverHeight }]}>
+          <Animated.Image
+            source={{ uri: getCoverForDestination(trip.destination, trip.id) }}
+            style={styles.coverImg}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.88)']}
+            locations={[0.25, 0.58, 1]}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <Animated.View style={[styles.heroContent, { opacity: heroOpacity }]}>
+            <View style={styles.heroBottom}>
+              <Text style={styles.heroTitle} numberOfLines={2}>{trip.title}</Text>
+              <View style={styles.heroMetaItem}>
+                <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.heroMetaText}>{trip.destination}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </Animated.View>
 
         {/* Tabs */}
         <View style={styles.tabs}>
@@ -1044,7 +1097,7 @@ export default function TripDetailScreen() {
                     <Text style={styles.aiBannerTitle}>AI gợi ý lịch trình cho bạn</Text>
                   </View>
                   <TouchableOpacity onPress={() => setDismissedAI(true)}>
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
+                    <Ionicons name="close" size={18} color={colors.nomad.onSurfaceVariant} />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.aiBannerSub}>Chọn phong cách chuyến đi</Text>
@@ -1089,7 +1142,7 @@ export default function TripDetailScreen() {
 
             {items.length === 0 ? (
               <View style={styles.emptyWrap}>
-                <Ionicons name="map-outline" size={64} color={colors.border} />
+                <Ionicons name="map-outline" size={64} color={colors.nomad.outlineVariant} />
                 <Text style={styles.emptyTitle}>Chưa có địa điểm nào</Text>
                 <Text style={styles.emptyBody}>
                   {dismissedAI ? 'Thêm địa điểm đầu tiên vào lịch trình' : 'Tự thêm địa điểm hoặc để AI gợi ý lịch trình phù hợp'}
@@ -1138,7 +1191,7 @@ export default function TripDetailScreen() {
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {(itemsByDay[selectedDay] ?? []).length > 0 && (
                         <TouchableOpacity
-                          style={[styles.dayAddBtn, editMode && { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' }]}
+                          style={[styles.dayAddBtn, editMode && { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer }]}
                           onPress={() => { editMode ? exitEditMode() : setEditMode(true); setCheckedIds(new Set()); }}
                         >
                           <Ionicons name={editMode ? 'checkmark' : 'create-outline'} size={14} color={colors.nomad.primary} />
@@ -1150,7 +1203,7 @@ export default function TripDetailScreen() {
 
                   {(itemsByDay[selectedDay] ?? []).length === 0 ? (
                     <View style={styles.dayEmptyWrap}>
-                      <Ionicons name="calendar-outline" size={40} color={colors.border} />
+                      <Ionicons name="calendar-outline" size={40} color={colors.nomad.outlineVariant} />
                       <Text style={styles.dayEmptyText}>Chưa có địa điểm cho ngày này</Text>
                       <TouchableOpacity style={styles.dayEmptyAddBtn} onPress={() => openAddExp(selectedDay)}>
                         <Text style={styles.dayEmptyAddText}>+ Thêm địa điểm</Text>
@@ -1169,7 +1222,7 @@ export default function TripDetailScreen() {
                       onReorder={(newItems) => handleDragEnd(selectedDay, newItems)}
                       onItemPress={(item) => {
                         if (editMode) {
-                          setCheckedIds(prev => { const n = new Set(prev); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n; });
+                          setSelectedItem(item);
                         } else {
                           if (item.location_id) router.push(`/location/${item.location_id}`);
                           else if (item.experience_id) router.push(`/experience/${item.experience_id}`);
@@ -1188,8 +1241,8 @@ export default function TripDetailScreen() {
                         onPress={() => setShowMoveModal(true)}
                         disabled={checkedIds.size === 0}
                       >
-                        <Ionicons name="arrow-forward-circle-outline" size={18} color={checkedIds.size > 0 ? colors.nomad.primary : colors.border} />
-                        <Text style={[styles.editActionText, { color: checkedIds.size > 0 ? colors.nomad.primary : colors.border }]}>
+                        <Ionicons name="arrow-forward-circle-outline" size={18} color={checkedIds.size > 0 ? colors.nomad.primary : colors.nomad.outlineVariant} />
+                        <Text style={[styles.editActionText, { color: checkedIds.size > 0 ? colors.nomad.primary : colors.nomad.outlineVariant }]}>
                           Chuyển ngày ({checkedIds.size})
                         </Text>
                       </TouchableOpacity>
@@ -1198,8 +1251,8 @@ export default function TripDetailScreen() {
                         onPress={bulkDelete}
                         disabled={checkedIds.size === 0}
                       >
-                        <Ionicons name="trash-outline" size={18} color={checkedIds.size > 0 ? colors.error : colors.border} />
-                        <Text style={[styles.editActionText, { color: checkedIds.size > 0 ? colors.error : colors.border }]}>
+                        <Ionicons name="trash-outline" size={18} color={checkedIds.size > 0 ? colors.error : colors.nomad.outlineVariant} />
+                        <Text style={[styles.editActionText, { color: checkedIds.size > 0 ? colors.error : colors.nomad.outlineVariant }]}>
                           Xoá ({checkedIds.size})
                         </Text>
                       </TouchableOpacity>
@@ -1213,67 +1266,46 @@ export default function TripDetailScreen() {
 
         {/* ── JOURNAL ── */}
         {tab === 'journal' && (
-          <View style={{ padding: spacing.lg }}>
-            {journals.map((j) => (
-              <View key={j.id} style={styles.journalCard}>
-                <View style={styles.journalHeader}>
-                  <Text style={styles.journalDay}>Ngày {j.day_number}</Text>
-                  {j.mood && <Text style={{ fontSize: 18 }}>{MOOD_ICONS[j.mood]}</Text>}
-                </View>
-                <Text style={styles.journalContent}>{j.content}</Text>
+          <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 100 }}>
+            {journals.length === 0 ? (
+              <View style={styles.journalEmpty}>
+                <Text style={styles.journalEmptyIcon}>📖</Text>
+                <Text style={styles.journalEmptyTitle}>Chưa có ghi chú nào</Text>
+                <Text style={styles.journalEmptyBody}>Ghi lại cảm xúc và kỷ niệm của từng ngày trong chuyến đi</Text>
+                <TouchableOpacity style={styles.journalEmptyBtn} onPress={() => openJournalModal(1)}>
+                  <Ionicons name="create-outline" size={16} color={colors.nomad.onPrimary} />
+                  <Text style={styles.journalEmptyBtnText}>Viết ghi chú đầu tiên</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-
-            <View style={styles.journalForm}>
-              <Text style={styles.formLabel}>Thêm ghi chú · Ngày {journalDay}</Text>
-
-              {/* Day selector */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      style={[styles.dayBtn, journalDay === d && styles.dayBtnActive]}
-                      onPress={() => {
-                        setJournalDay(d);
-                        const existing = journals.find(j => j.day_number === d);
-                        setJournalContent(existing?.content ?? '');
-                        setJournalMood(existing?.mood ?? null);
-                      }}
-                    >
-                      <Text style={[styles.dayBtnText, journalDay === d && styles.dayBtnTextActive]}>{d}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* Mood picker */}
-              <Text style={styles.moodLabel}>Cảm xúc hôm nay</Text>
-              <View style={styles.moodRow}>
-                {MOOD_OPTIONS.map((m) => (
-                  <TouchableOpacity
-                    key={m.value}
-                    style={[styles.moodBtn, journalMood === m.value && styles.moodBtnActive]}
-                    onPress={() => setJournalMood(journalMood === m.value ? null : m.value)}
-                  >
-                    <Text style={styles.moodIcon}>{m.icon}</Text>
-                    <Text style={[styles.moodBtnLabel, journalMood === m.value && styles.moodBtnLabelActive]}>{m.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TextInput
-                style={styles.journalInput}
-                multiline
-                numberOfLines={4}
-                placeholder="Hôm nay bạn đã khám phá được gì?"
-                placeholderTextColor={colors.textMuted}
-                value={journalContent}
-                onChangeText={setJournalContent}
-                textAlignVertical="top"
-              />
-              <Button label="Lưu ghi chú" onPress={saveJournal} loading={saving} />
-            </View>
+            ) : (
+              [...journals].sort((a, b) => a.day_number - b.day_number).map((j) => (
+                <TouchableOpacity
+                  key={j.id}
+                  style={styles.journalEntry}
+                  onPress={() => openJournalModal(j.day_number)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.journalMoodBar, { backgroundColor: j.mood ? MOOD_COLORS[j.mood] : colors.nomad.outlineVariant }]} />
+                  <View style={styles.journalEntryInner}>
+                    <View style={styles.journalEntryHeader}>
+                      <View>
+                        <Text style={styles.journalEntryDay}>Ngày {j.day_number}</Text>
+                        {journalDateLabel(trip, j.day_number) ? (
+                          <Text style={styles.journalEntryDate}>{journalDateLabel(trip, j.day_number)}</Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.journalEntryRight}>
+                        {j.mood && <Text style={styles.journalMoodEmoji}>{MOOD_ICONS[j.mood]}</Text>}
+                        <View style={styles.journalEditBtn}>
+                          <Ionicons name="create-outline" size={14} color={colors.nomad.primary} />
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={styles.journalEntryContent} numberOfLines={4}>{j.content}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
 
@@ -1292,7 +1324,7 @@ export default function TripDetailScreen() {
                     if (data) setTrip(data);
                   }}
                 >
-                  <Ionicons name={opt.icon as any} size={16} color={trip.status === opt.value ? colors.nomad.primary : colors.textMuted} />
+                  <Ionicons name={opt.icon as any} size={16} color={trip.status === opt.value ? colors.nomad.primary : colors.nomad.onSurfaceVariant} />
                   <Text style={[styles.statusBtnText, trip.status === opt.value && styles.statusBtnTextActive]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -1361,6 +1393,12 @@ export default function TripDetailScreen() {
         </TouchableOpacity>
       )}
 
+      {tab === 'journal' && (
+        <TouchableOpacity style={styles.fab} onPress={() => openJournalModal(journalDay)} activeOpacity={0.85}>
+          <Ionicons name="create-outline" size={22} color={colors.textOnDark} />
+        </TouchableOpacity>
+      )}
+
       {/* ── Map Modal ── */}
       <Modal visible={mapModalVisible} animationType="slide" statusBarTranslucent onRequestClose={() => setMapModalVisible(false)}>
         <SafeAreaView style={styles.mapModalContainer}>
@@ -1395,9 +1433,18 @@ export default function TripDetailScreen() {
             </ScrollView>
           )}
 
+          {/* GPS locating indicator */}
+          {mapLocating && (
+            <View style={styles.mapLocatingBar}>
+              <ActivityIndicator size="small" color={colors.nomad.primary} />
+              <Text style={styles.mapLocatingText}>Đang xác định vị trí...</Text>
+            </View>
+          )}
+
           {/* Map */}
           <View style={{ flex: 1 }}>
             <WebView
+              ref={mapWebViewRef}
               key={mapDay}
               source={{ html: buildLeafletHtml(
                 (itemsByDay[mapDay] ?? [])
@@ -1409,7 +1456,7 @@ export default function TripDetailScreen() {
                     }
                     return acc;
                   }, []),
-                userLocation,
+                null,   // luôn null — user dot được inject sau qua JS
               )}}
               onLoad={() => setMapWebViewLoading(false)}
               style={{ flex: 1 }}
@@ -1419,6 +1466,7 @@ export default function TripDetailScreen() {
             {mapWebViewLoading && (
               <View style={styles.mapLoadingOverlay}>
                 <ActivityIndicator size="large" color={colors.nomad.primary} />
+                <Text style={styles.mapLoadingText}>Đang tải bản đồ...</Text>
               </View>
             )}
           </View>
@@ -1450,14 +1498,14 @@ export default function TripDetailScreen() {
               const locLabel  = loc?.district ?? loc?.address ?? selectedItem.experience_location;
               const category  = loc?.category ?? selectedItem.experience_category;
               const shortDesc = loc?.short_description ?? loc?.hint ?? selectedItem.note;
-              const longDesc  = loc?.long_description;
+              const longDesc  = loc?.short_description;
               return (
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {coverImg ? (
                     <Image source={{ uri: coverImg }} style={styles.detailImg} />
                   ) : (
                     <View style={styles.detailImgPlaceholder}>
-                      <Ionicons name="image-outline" size={40} color={colors.border} />
+                      <Ionicons name="image-outline" size={40} color={colors.nomad.outlineVariant} />
                     </View>
                   )}
                   <View style={styles.detailBody}>
@@ -1469,16 +1517,30 @@ export default function TripDetailScreen() {
                     <Text style={styles.detailTitle}>{title}</Text>
                     {locLabel && (
                       <View style={styles.detailRow}>
-                        <Ionicons name="location-outline" size={15} color={colors.textMuted} />
+                        <Ionicons name="location-outline" size={15} color={colors.nomad.onSurfaceVariant} />
                         <Text style={styles.detailRowText}>{locLabel}</Text>
                       </View>
                     )}
                     <View style={styles.detailRow}>
-                      <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
-                      <Text style={styles.detailRowText}>
-                        Ngày {selectedItem.day_number} · {slot?.icon} {slot?.label}
-                        {selectedItem.visit_time ? ` · ${selectedItem.visit_time.slice(0, 5)}` : ''}
-                      </Text>
+                      <Ionicons name="calendar-outline" size={15} color={colors.nomad.onSurfaceVariant} />
+                      <Text style={styles.detailRowText}>Ngày {selectedItem.day_number}</Text>
+                    </View>
+                    <View style={styles.slotEditRow}>
+                      <Text style={styles.slotEditLabel}>Buổi</Text>
+                      <View style={styles.slotChips}>
+                        {TIME_SLOTS.map(s => (
+                          <TouchableOpacity
+                            key={s.value}
+                            style={[styles.slotChip, selectedItem.time_slot === s.value && styles.slotChipActive]}
+                            onPress={() => updateItemSlot(selectedItem.id, s.value)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.slotChipText, selectedItem.time_slot === s.value && styles.slotChipTextActive]}>
+                              {s.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                     {!!(loc?.rating || loc?.duration_minutes || loc?.price_per_person) && (
                       <View style={[styles.detailRow, { flexWrap: 'wrap', gap: 12 }]}>
@@ -1489,7 +1551,7 @@ export default function TripDetailScreen() {
                       </View>
                     )}
                     {shortDesc && <Text style={styles.detailDesc}>{shortDesc}</Text>}
-                    {longDesc && longDesc !== shortDesc && <Text style={[styles.detailDesc, { color: colors.textMuted }]}>{longDesc}</Text>}
+                    {longDesc && longDesc !== shortDesc && <Text style={[styles.detailDesc, { color: colors.nomad.onSurfaceVariant }]}>{longDesc}</Text>}
                     {selectedItem.note && !shortDesc?.includes(selectedItem.note) && (
                       <View style={styles.detailNoteBox}>
                         <Text style={styles.detailNoteLabel}>Ghi chú</Text>
@@ -1497,7 +1559,7 @@ export default function TripDetailScreen() {
                       </View>
                     )}
                     {selectedItem.ai_reason && (
-                      <View style={[styles.detailNoteBox, { borderColor: colors.nomad.primary + '40', backgroundColor: '#e8f0d8' }]}>
+                      <View style={[styles.detailNoteBox, { borderColor: colors.nomad.primary + '40', backgroundColor: colors.nomad.secondaryContainer }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                           <Ionicons name="sparkles" size={12} color={colors.nomad.primary} />
                           <Text style={[styles.detailNoteLabel, { color: colors.nomad.primary }]}>AI chọn vì</Text>
@@ -1530,7 +1592,7 @@ export default function TripDetailScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ngày đi & về</Text>
               <TouchableOpacity onPress={() => setShowDateModal(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
+                <Ionicons name="close" size={22} color={colors.nomad.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
             <Text style={styles.dateSetupLabel}>Ngày đi *</Text>
@@ -1552,7 +1614,7 @@ export default function TripDetailScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chỉnh sửa trip</Text>
               <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
+                <Ionicons name="close" size={22} color={colors.nomad.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
             <Text style={styles.dateSetupLabel}>Tên chuyến đi</Text>
@@ -1561,11 +1623,86 @@ export default function TripDetailScreen() {
               value={editTitle}
               onChangeText={setEditTitle}
               placeholder="Tên chuyến đi..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.nomad.onSurfaceVariant}
             />
             <View style={{ marginTop: spacing.xl }}>
               <Button label="Lưu" onPress={saveEdit} loading={savingEdit} disabled={!editTitle.trim()} />
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Journal Modal ── */}
+      <Modal visible={showJournalModal} animationType="slide" transparent onRequestClose={() => setShowJournalModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '88%' }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {journals.find(j => j.day_number === journalDay) ? 'Chỉnh sửa' : 'Viết ghi chú'} · Ngày {journalDay}
+              </Text>
+              <TouchableOpacity onPress={() => setShowJournalModal(false)}>
+                <Ionicons name="close" size={22} color={colors.nomad.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Day selector */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.dayBtn, journalDay === d && styles.dayBtnActive]}
+                      onPress={() => {
+                        setJournalDay(d);
+                        const existing = journals.find(j => j.day_number === d);
+                        setJournalContent(existing?.content ?? '');
+                        setJournalMood(existing?.mood ?? null);
+                      }}
+                    >
+                      <Text style={[styles.dayBtnText, journalDay === d && styles.dayBtnTextActive]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {/* Mood picker */}
+              <Text style={styles.moodLabel}>Cảm xúc hôm nay</Text>
+              <View style={styles.moodRow}>
+                {MOOD_OPTIONS.map((m) => (
+                  <TouchableOpacity
+                    key={m.value}
+                    style={[styles.moodBtn, journalMood === m.value && styles.moodBtnActive]}
+                    onPress={() => setJournalMood(journalMood === m.value ? null : m.value)}
+                  >
+                    <Text style={styles.moodIcon}>{m.icon}</Text>
+                    <Text style={[styles.moodBtnLabel, journalMood === m.value && styles.moodBtnLabelActive]}>{m.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={[styles.journalInput, { minHeight: 160 }]}
+                multiline
+                placeholder="Hôm nay bạn đã khám phá được gì?"
+                placeholderTextColor={colors.nomad.onSurfaceVariant}
+                value={journalContent}
+                onChangeText={setJournalContent}
+                textAlignVertical="top"
+              />
+              <View style={{ marginTop: spacing.sm, paddingBottom: spacing.lg }}>
+                <Button
+                  label="Lưu ghi chú"
+                  loading={saving}
+                  onPress={async () => {
+                    if (!journalContent.trim()) return;
+                    await saveJournal();
+                    setShowJournalModal(false);
+                  }}
+                />
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1578,10 +1715,10 @@ export default function TripDetailScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chuyển sang ngày</Text>
               <TouchableOpacity onPress={() => setShowMoveModal(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
+                <Ionicons name="close" size={22} color={colors.nomad.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.md }}>
+            <Text style={{ fontSize: 13, color: colors.nomad.onSurfaceVariant, marginBottom: spacing.md }}>
               Chọn ngày để chuyển {checkedIds.size} địa điểm đã chọn
             </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -1615,30 +1752,36 @@ export default function TripDetailScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.bgScreen },
+  container:    { flex: 1, backgroundColor: colors.nomad.background },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  navbar:       { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
-  backBtn:      { width: 38, height: 38, borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  editNavBtn:   { width: 38, height: 38, borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  navbarInfo:   { flex: 1, gap: 4 },
-  navbarTitle:  { fontSize: 16, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  navbar:        { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
+  navbarBg:      { ...StyleSheet.absoluteFillObject as any, backgroundColor: colors.nomad.primary },
+  backBtn:       { width: 38, height: 38, borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
+  editNavBtn:    { width: 38, height: 38, borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
+  navbarInfo:    { flex: 1 },
+  navbarTitle:   { fontSize: 16, fontWeight: '700', color: '#fff' },
 
-  cover:        { width: '100%', resizeMode: 'cover' },
-  coverMeta:    { backgroundColor: colors.bgCard, paddingHorizontal: spacing.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  destination:  { fontSize: 14, fontWeight: '500', color: colors.textPrimary },
-  dates:        { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  coverWrap:     { width: '100%', overflow: 'hidden' },
+  coverImg:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  heroContent:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: 72, paddingBottom: spacing.lg },
+  heroTop:       { flexDirection: 'row', alignItems: 'flex-start' },
+  heroBottom:    { gap: 8 },
+  heroTitle:     { fontSize: 30, fontWeight: '900', color: '#fff', lineHeight: 37, letterSpacing: -0.5, textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12 },
+  heroMeta:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  heroMetaItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroMetaText:  { fontSize: 13, color: 'rgba(255,255,255,0.88)', fontWeight: '500' },
 
-  tabs:         { flexDirection: 'row', backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabs:         { flexDirection: 'row', backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   tabBtn:       { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.nomad.primary },
-  tabText:      { fontSize: 13, fontWeight: '500', color: colors.textMuted },
+  tabText:      { fontSize: 13, fontWeight: '500', color: colors.nomad.onSurfaceVariant },
   tabTextActive: { color: colors.nomad.primary, fontWeight: '600' },
 
   // Setup card
-  setupCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#e8f0d8', borderRadius: radius.lg, padding: spacing.md, margin: spacing.md, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
+  setupCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.nomad.secondaryContainer, borderRadius: radius.lg, padding: spacing.md, margin: spacing.md, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
   setupCardLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  setupCardIcon:  { width: 40, height: 40, borderRadius: radius.lg, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  setupCardIcon:  { width: 40, height: 40, borderRadius: radius.lg, backgroundColor: colors.nomad.surfaceContainerLow, alignItems: 'center', justifyContent: 'center' },
   setupCardTitle: { fontSize: 14, fontWeight: '700', color: colors.nomad.primary },
   setupCardSub:   { fontSize: 12, color: colors.nomad.primary + 'aa', marginTop: 2 },
   setupCardRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1647,54 +1790,54 @@ const styles = StyleSheet.create({
   extendBtnText:  { fontSize: 11, color: colors.nomad.primary, fontWeight: '700', minWidth: 20, textAlign: 'center' },
 
   // AI banner
-  aiBanner:         { backgroundColor: colors.bgCard, borderRadius: radius.lg, padding: spacing.md, margin: spacing.md, borderWidth: 1, borderColor: colors.border },
+  aiBanner:         { backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, padding: spacing.md, margin: spacing.md, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
   aiBannerTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   aiBannerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  aiBannerTitle:    { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  aiBannerSub:      { fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
+  aiBannerTitle:    { fontSize: 14, fontWeight: '700', color: colors.nomad.onSurface },
+  aiBannerSub:      { fontSize: 12, color: colors.nomad.onSurfaceVariant, marginBottom: spacing.sm },
   vibesRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md },
-  vibeChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  vibeChipActive:   { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
-  vibeChipText:     { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  vibeChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.nomad.background, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  vibeChipActive:   { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  vibeChipText:     { fontSize: 12, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
   vibeChipTextActive: { color: colors.nomad.primary, fontWeight: '700' },
   stepperRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.sm },
   stepperBtn:       { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
-  stepperValue:     { fontSize: 15, fontWeight: '600', color: colors.textPrimary, minWidth: 56, textAlign: 'center' },
+  stepperValue:     { fontSize: 15, fontWeight: '600', color: colors.nomad.onSurface, minWidth: 56, textAlign: 'center' },
   aiLogText:        { fontSize: 12, color: colors.nomad.primary, marginTop: 8 },
   aiBannerBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingVertical: 10, borderRadius: radius.lg },
   aiBannerBtnText:  { color: colors.textOnDark, fontWeight: '600', fontSize: 13 },
 
   // Empty
   emptyWrap:      { alignItems: 'center', paddingTop: 60, paddingBottom: 40, paddingHorizontal: spacing.xl },
-  emptyTitle:     { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' },
-  emptyBody:      { fontSize: 14, color: colors.textMuted, marginTop: spacing.sm, textAlign: 'center', lineHeight: 22 },
+  emptyTitle:     { fontSize: 18, fontWeight: '700', color: colors.nomad.onSurface, marginTop: spacing.lg, textAlign: 'center' },
+  emptyBody:      { fontSize: 14, color: colors.nomad.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center', lineHeight: 22 },
   aiSuggestBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.xl },
   aiSuggestText:  { color: colors.nomad.primary, fontWeight: '700', fontSize: 14 },
   addInlineBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, marginTop: spacing.md },
   addInlineBtnText: { color: colors.textOnDark, fontWeight: '700', fontSize: 14 },
 
   // Day selector
-  daySelectorBar:            { backgroundColor: colors.bgCard, borderBottomWidth: 1, borderBottomColor: colors.border },
+  daySelectorBar:            { backgroundColor: colors.nomad.surfaceContainerLow, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   daySelectorContent:        { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: 8 },
-  daySelectorChip:           { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  daySelectorChipActive:     { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
-  daySelectorDay:            { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  daySelectorChip:           { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.background },
+  daySelectorChipActive:     { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  daySelectorDay:            { fontSize: 12, fontWeight: '700', color: colors.nomad.onSurfaceVariant },
   daySelectorDayActive:      { color: colors.nomad.primary },
-  daySelectorDate:           { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  daySelectorDate:           { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 1 },
   daySelectorDateActive:     { color: colors.nomad.primary + 'aa' },
-  daySelectorBadge:          { marginTop: 5, backgroundColor: colors.border, borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 2 },
+  daySelectorBadge:          { marginTop: 5, backgroundColor: colors.nomad.outlineVariant, borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 2 },
   daySelectorBadgeActive:    { backgroundColor: colors.nomad.primary + '25' },
-  daySelectorBadgeText:      { fontSize: 10, color: colors.textMuted, fontWeight: '600' },
+  daySelectorBadgeText:      { fontSize: 10, color: colors.nomad.onSurfaceVariant, fontWeight: '600' },
   daySelectorBadgeTextActive: { color: colors.nomad.primary },
 
   // Day content
   dayContent:       { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   dayContentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  dayContentTitle:  { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  dayContentTitle:  { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface },
   dayAddBtn:        { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.nomad.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
   dayAddText:       { fontSize: 12, color: colors.nomad.primary, fontWeight: '600' },
   dayEmptyWrap:     { alignItems: 'center', paddingVertical: 48, gap: 10 },
-  dayEmptyText:     { fontSize: 14, color: colors.textMuted },
+  dayEmptyText:     { fontSize: 14, color: colors.nomad.onSurfaceVariant },
   dayEmptyAddBtn:   { marginTop: 4, paddingHorizontal: 20, paddingVertical: 10, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.nomad.primary },
   dayEmptyAddText:  { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
 
@@ -1708,20 +1851,20 @@ const styles = StyleSheet.create({
 
   dragHandle:        { width: 28, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 14 },
   checkboxWrap:      { width: 28, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 14 },
-  checkbox:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgCard },
+  checkbox:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.nomad.outlineVariant, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.nomad.surfaceContainerLow },
   checkboxChecked:   { backgroundColor: colors.nomad.primary, borderColor: colors.nomad.primary },
-  editActionBar:     { flexDirection: 'row', gap: 10, marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  editActionBar:     { flexDirection: 'row', gap: 10, marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.nomad.outlineVariant },
   editActionBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1.5 },
   editActionText:    { fontSize: 13, fontWeight: '600' },
-  moveDayChip:       { paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8', minWidth: 90, alignItems: 'center' },
+  moveDayChip:       { paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer, minWidth: 90, alignItems: 'center' },
   moveDayChipText:   { fontSize: 14, fontWeight: '700', color: colors.nomad.primary },
   timelineTimeCol:   { width: 44, alignItems: 'flex-end', paddingRight: 6, paddingTop: 32 },
   timelineTime:      { fontSize: 11, fontWeight: '700', color: colors.nomad.primary },
   timelineDotCol:    { width: 16, alignItems: 'center', paddingTop: 11 },
-  timelineDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border, borderWidth: 2, borderColor: colors.nomad.primary },
+  timelineDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.nomad.outlineVariant, borderWidth: 2, borderColor: colors.nomad.primary },
   timelineDotFirst:  { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.nomad.primary, borderWidth: 0 },
   timelineLine:      { width: 2, flex: 1, backgroundColor: colors.nomad.primary + '25', marginTop: 4 },
-  timelineCard:       { flex: 1, backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.nomad.primary + '30', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  timelineCard:       { flex: 1, backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.nomad.primary + '30', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
   timelineCardActive: { borderColor: colors.nomad.primary, borderWidth: 2, backgroundColor: '#f4f8ec', shadowOpacity: 0.14, elevation: 5 },
   cardInner:          { flexDirection: 'row', alignItems: 'stretch', flex: 1 },
   cardThumb:          { width: 80, height: 88, justifyContent: 'flex-end' },
@@ -1731,13 +1874,13 @@ const styles = StyleSheet.create({
   cardBody:           { flex: 1, padding: spacing.sm, justifyContent: 'center' },
   cardLocRow:         { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
   cardTitleRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  timelineTitle:      { flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary, lineHeight: 19 },
-  timelineCardLoc:    { fontSize: 11, color: colors.textMuted },
-  timelineCardDesc:   { fontSize: 11, color: colors.textMuted, marginTop: 3, lineHeight: 16 },
+  timelineTitle:      { flex: 1, fontSize: 13, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 19 },
+  timelineCardLoc:    { fontSize: 11, color: colors.nomad.onSurfaceVariant },
+  timelineCardDesc:   { fontSize: 11, color: colors.nomad.onSurfaceVariant, marginTop: 3, lineHeight: 16 },
   timelineTags:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  tagChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, backgroundColor: colors.bgScreen, borderWidth: 1, borderColor: colors.border },
-  tagChipText:        { fontSize: 11, color: colors.textMuted, fontWeight: '500' },
-  aiItemBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, backgroundColor: '#e8f0d8' },
+  tagChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, backgroundColor: colors.nomad.background, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  tagChipText:        { fontSize: 11, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  aiItemBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.nomad.secondaryContainer },
   aiItemBadgeText:    { fontSize: 10, color: colors.nomad.primary, fontWeight: '700' },
 
 
@@ -1746,53 +1889,70 @@ const styles = StyleSheet.create({
   fabMap: { position: 'absolute', bottom: 24, left: 24,  width: 50, height: 50, borderRadius: 25, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6 },
 
   // Journal
-  journalCard:      { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
-  journalHeader:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  journalDay:       { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  journalContent:   { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
-  journalForm:      { backgroundColor: colors.bgCard, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginTop: spacing.md },
-  formLabel:        { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
-  dayBtn:           { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e8f0d8', alignItems: 'center', justifyContent: 'center' },
+  journalEntry:        { flexDirection: 'row', backgroundColor: colors.nomad.surfaceContainerLow, borderRadius: radius.lg, marginBottom: spacing.md, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
+  journalMoodBar:      { width: 5 },
+  journalEntryInner:   { flex: 1, padding: spacing.md },
+  journalEntryHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
+  journalEntryDay:     { fontSize: 15, fontWeight: '700', color: colors.nomad.onSurface },
+  journalEntryDate:    { fontSize: 12, color: colors.nomad.onSurfaceVariant, marginTop: 2 },
+  journalEntryRight:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  journalMoodEmoji:    { fontSize: 22 },
+  journalEditBtn:      { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
+  journalEntryContent: { fontSize: 14, color: colors.nomad.onSurface, lineHeight: 22 },
+  journalEmpty:        { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
+  journalEmptyIcon:    { fontSize: 48, marginBottom: spacing.md },
+  journalEmptyTitle:   { fontSize: 18, fontWeight: '700', color: colors.nomad.onSurface, marginBottom: spacing.sm },
+  journalEmptyBody:    { fontSize: 14, color: colors.nomad.onSurfaceVariant, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+  journalEmptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.nomad.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.xl },
+  journalEmptyBtnText: { fontSize: 14, color: colors.nomad.onPrimary, fontWeight: '700' },
+  dayBtn:           { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.nomad.secondaryContainer, alignItems: 'center', justifyContent: 'center' },
   dayBtnActive:     { backgroundColor: colors.nomad.primary },
   dayBtnText:       { fontSize: 13, fontWeight: '500', color: colors.nomad.primary },
   dayBtnTextActive: { color: colors.textOnDark },
-  moodLabel:        { fontSize: 12, fontWeight: '600', color: colors.textMuted, marginBottom: 8, marginTop: spacing.sm },
+  moodLabel:        { fontSize: 12, fontWeight: '600', color: colors.nomad.onSurfaceVariant, marginBottom: 8, marginTop: spacing.sm },
   moodRow:          { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  moodBtn:          { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen },
-  moodBtnActive:    { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
+  moodBtn:          { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.background },
+  moodBtnActive:    { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
   moodIcon:         { fontSize: 20, marginBottom: 2 },
-  moodBtnLabel:     { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
+  moodBtnLabel:     { fontSize: 10, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
   moodBtnLabelActive: { color: colors.nomad.primary, fontWeight: '700' },
-  journalInput:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.textPrimary, minHeight: 100, marginBottom: spacing.md },
+  journalInput:     { borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.nomad.onSurface, minHeight: 100, marginBottom: spacing.md },
 
   // Info
-  infoSectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  infoSectionLabel: { fontSize: 13, fontWeight: '700', color: colors.nomad.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   statusRow:        { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },
-  statusBtn:        { flex: 1, flexDirection: 'column', alignItems: 'center', paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgScreen, gap: 4 },
-  statusBtnActive:  { borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
-  statusBtnText:    { fontSize: 10, color: colors.textMuted, fontWeight: '500', textAlign: 'center' },
+  statusBtn:        { flex: 1, flexDirection: 'column', alignItems: 'center', paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.background, gap: 4 },
+  statusBtnActive:  { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  statusBtnText:    { fontSize: 10, color: colors.nomad.onSurfaceVariant, fontWeight: '500', textAlign: 'center' },
   statusBtnTextActive: { color: colors.nomad.primary, fontWeight: '700' },
-  infoRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  infoLabel:        { fontSize: 13, color: colors.textMuted },
-  infoValue:        { fontSize: 13, fontWeight: '500', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
+  infoRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  infoLabel:        { fontSize: 13, color: colors.nomad.onSurfaceVariant },
+  infoValue:        { fontSize: 13, fontWeight: '500', color: colors.nomad.onSurface, flexShrink: 1, textAlign: 'right', maxWidth: '60%' },
   infoActions:      { marginTop: spacing.xl, gap: 10 },
-  infoActionBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.primary, backgroundColor: '#e8f0d8' },
+  infoActionBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
   infoActionText:   { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
 
   // Detail modal
   detailImg:             { width: '100%', height: 200, borderRadius: radius.lg, resizeMode: 'cover', marginBottom: spacing.md },
-  detailImgPlaceholder:  { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.bgScreen, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  detailImgPlaceholder:  { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.nomad.background, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   detailBody:            { paddingBottom: spacing.lg },
-  detailCatBadge:        { alignSelf: 'flex-start', backgroundColor: '#e8f0d8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginBottom: 8 },
+  detailCatBadge:        { alignSelf: 'flex-start', backgroundColor: colors.nomad.secondaryContainer, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginBottom: 8 },
   detailCatText:         { fontSize: 11, fontWeight: '600', color: colors.nomad.primary },
-  detailTitle:           { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.sm },
+  detailTitle:           { fontSize: 18, fontWeight: '800', color: colors.nomad.onSurface, marginBottom: spacing.sm },
   detailRow:             { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  detailRowText:         { fontSize: 13, color: colors.textMuted },
-  detailMeta:            { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  detailDesc:            { fontSize: 14, color: colors.textPrimary, lineHeight: 21, marginTop: spacing.sm },
-  detailNoteBox:         { backgroundColor: colors.bgScreen, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  detailNoteLabel:       { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginBottom: 4 },
-  detailNoteText:        { fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
+  detailRowText:         { fontSize: 13, color: colors.nomad.onSurfaceVariant },
+  detailMeta:            { fontSize: 13, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  detailDesc:            { fontSize: 14, color: colors.nomad.onSurface, lineHeight: 21, marginTop: spacing.sm },
+  detailNoteBox:         { backgroundColor: colors.nomad.background, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.nomad.outlineVariant },
+  detailNoteLabel:       { fontSize: 11, fontWeight: '600', color: colors.nomad.onSurfaceVariant, marginBottom: 4 },
+  detailNoteText:        { fontSize: 13, color: colors.nomad.onSurface, lineHeight: 20 },
+  slotEditRow:           { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: spacing.sm },
+  slotEditLabel:         { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurfaceVariant, width: 36 },
+  slotChips:             { flexDirection: 'row', gap: 8 },
+  slotChip:              { paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.nomad.outlineVariant, backgroundColor: colors.nomad.surfaceContainerLow },
+  slotChipActive:        { borderColor: colors.nomad.primary, backgroundColor: colors.nomad.secondaryContainer },
+  slotChipText:          { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurfaceVariant },
+  slotChipTextActive:    { color: colors.nomad.primary },
   detailActions:         { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
   detailDeleteBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.error, paddingVertical: 12, borderRadius: radius.lg },
   detailDeleteText:      { fontSize: 13, fontWeight: '600', color: colors.error },
@@ -1800,38 +1960,45 @@ const styles = StyleSheet.create({
   detailCloseBtnText:    { fontSize: 13, fontWeight: '600', color: colors.textOnDark },
 
   // Date modal
-  dateSetupLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: spacing.sm },
+  dateSetupLabel: { fontSize: 13, fontWeight: '600', color: colors.nomad.onSurfaceVariant, marginBottom: 6, marginTop: spacing.sm },
 
   // Edit trip
-  editInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgScreen },
+  editInput: { borderWidth: 1, borderColor: colors.nomad.outlineVariant, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.nomad.onSurface, backgroundColor: colors.nomad.background },
 
   // Modal base
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet:   { backgroundColor: colors.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
-  modalHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.md },
+  modalSheet:   { backgroundColor: colors.nomad.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40, maxHeight: '85%' },
+  modalHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.nomad.outlineVariant, alignSelf: 'center', marginBottom: spacing.md },
   modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle:   { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  modalTitle:   { fontSize: 18, fontWeight: '800', color: colors.nomad.onSurface },
 
   // Error
   errorBox:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 10, marginBottom: spacing.md, borderWidth: 1, borderColor: '#FCA5A5' },
   errorText:  { flex: 1, color: colors.error, fontSize: 12 },
 
   // Map Modal
-  mapModalContainer: { flex: 1, backgroundColor: colors.bgCard },
+  mapModalContainer: { flex: 1, backgroundColor: colors.nomad.surfaceContainerLow },
   mapModalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant,
   },
   mapModalTitle: { fontSize: 17, fontWeight: '700', color: colors.nomad.onSurface },
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.bgCard,
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.nomad.surfaceContainerLow,
+    alignItems: 'center', justifyContent: 'center', gap: 12,
   },
+  mapLoadingText: { fontSize: 14, color: colors.nomad.onSurfaceVariant, fontWeight: '500' },
+  mapLocatingBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: spacing.lg, paddingVertical: 8,
+    backgroundColor: colors.nomad.secondaryContainer, borderBottomWidth: 1, borderBottomColor: colors.nomad.primary + '30',
+  },
+  mapLocatingText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '500' },
   mapModalFooter: {
     paddingHorizontal: spacing.lg, paddingVertical: 12,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    borderTopWidth: 1, borderTopColor: colors.nomad.outlineVariant,
   },
   mapGoogleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -1844,7 +2011,7 @@ const styles = StyleSheet.create({
   mapDayBar: {
     flexGrow: 0,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.nomad.outlineVariant,
     paddingVertical: 10,
   },
   mapDayChip: {
@@ -1852,8 +2019,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard,
+    borderColor: colors.nomad.outlineVariant,
+    backgroundColor: colors.nomad.surfaceContainerLow,
   },
   mapDayChipActive: {
     backgroundColor: colors.nomad.primary,
@@ -1862,7 +2029,7 @@ const styles = StyleSheet.create({
   mapDayChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.nomad.onSurfaceVariant,
   },
   mapDayChipTextActive: {
     color: colors.nomad.onPrimary,

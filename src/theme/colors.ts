@@ -7,7 +7,7 @@ export const colors = {
   secondary400: '#72AA8A',
   secondary100: '#D8EDE3',
 
-  bgScreen:  '#FAF7F2',
+  bgScreen:  '#FAF7EE',
   bgCard:    '#FFFFFF',
   border:    '#EDE3D8',
 
@@ -21,7 +21,7 @@ export const colors = {
 
   // Organic Nomad palette
   nomad: {
-    surface:          '#fafaf0',
+    surface:          '#FAFAF1',
     surfaceDim:       '#dadbd1',
     surfaceContainer: '#eeeee5',
     surfaceContainerLow: '#f4f4ea',
@@ -37,7 +37,7 @@ export const colors = {
     secondaryContainer: '#daeb95',
     inverseSurface:   '#2f312b',
     inverseOnSurface: '#f1f1e7',
-    background:       '#fafaf0',
+    background:       '#FAF7EE',
     onBackground:     '#1a1c17',
   },
 } as const;

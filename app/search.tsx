@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   categoryPillText: { fontSize: 11, fontWeight: '600', color: colors.nomad.onSurface },
 
   // Pick mode
-  pickBanner:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#e8f0d8', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
+  pickBanner:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.nomad.secondaryContainer, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.nomad.outlineVariant },
   pickBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '600' },
   pickBtn:        { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.nomad.primary, alignItems: 'center', justifyContent: 'center' },
 

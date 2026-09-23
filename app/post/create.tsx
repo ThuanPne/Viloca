@@ -196,6 +196,6 @@ const styles = StyleSheet.create({
   removeBtn:    { position: 'absolute', top: 4, right: 4 },
   addImageBtn:  { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.nomad.primary, borderRadius: radius.lg, borderStyle: 'dashed', alignSelf: 'flex-start' },
   addImageText: { fontSize: 14, color: colors.nomad.primary, fontWeight: '600' },
-  tripBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e8f0d8', borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
+  tripBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.nomad.secondaryContainer, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.nomad.primary + '40' },
   tripBannerText: { fontSize: 13, color: colors.nomad.primary, fontWeight: '500', flex: 1 },
 });
