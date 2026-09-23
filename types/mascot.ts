@@ -7,6 +7,7 @@ export type MascotEmotion =
 export interface MascotState {
   emotion: MascotEmotion;
   greeting: string;
+  senMessage: string;
 }
 
 export type MascotBubbleVariant = 'tip' | 'ai' | 'success' | 'error' | 'encouragement';

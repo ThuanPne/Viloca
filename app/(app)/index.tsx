@@ -11,7 +11,6 @@ import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/src/theme/colors';
 import { useMascot } from '@/hooks/useMascot';
 import MascotAvatar from '@/components/Mascot/MascotAvatar';
-import MascotBubble from '@/components/Mascot/MascotBubble';
 import { useFestivals } from '@/src/hooks/useFestivals';
 import { useLocations } from '@/src/hooks/useLocations';
 import { FilterSheet, FilterTab } from '@/src/components/home/FilterSheet';
@@ -250,33 +249,63 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* ── Header (scrolls with page) ── */}
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+          <View style={styles.headerBrand}>
             <Image source={require('@/assets/viloca-logo.png')} style={styles.logoImg} resizeMode="contain" />
+            <View>
+              <Text style={styles.brandName}>Viloca</Text>
+              <Text style={styles.brandSub}>Chuyến đi theo phong cách của bạn</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Ionicons name="notifications-outline" size={24} color={colors.nomad.onSurface} />
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.headerIcon}>
+              <Ionicons name="search-outline" size={22} color={colors.nomad.onSurface} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIcon}>
+              <View>
+                <Ionicons name="notifications-outline" size={22} color={colors.nomad.onSurface} />
+                <View style={styles.notifDot} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Hero Card ── */}
+        <View style={styles.greetingCard}>
+          <LinearGradient
+            colors={['#F1F8E9', '#E8F3DC']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
+          <View style={styles.heroDecorCircle} pointerEvents="none" />
+          <View style={styles.heroCardBody}>
+            <View style={styles.heroCardLeft}>
+              <View style={styles.heroBadge}>
+                <View style={styles.heroDot} />
+                <Text style={styles.heroLabelText}>Bạn đồng hành cùng bạn</Text>
+              </View>
+              <Text style={styles.greetingName}>Chào {firstName},</Text>
+              <Text style={styles.greetingTagline}>hôm nay mình{'\n'}đi đâu?</Text>
+            </View>
+            <MascotAvatar emotion={mascot.emotion} size={130} />
+          </View>
+          <View style={styles.senBubbleTail} />
+          <View style={styles.senBubble}>
+            <Text style={styles.senBubbleText}>{mascot.senMessage}</Text>
+          </View>
+        </View>{/* greetingCard */}
+
+        {/* ── Search bar ── */}
+        <View style={styles.searchBar}>
+          <TouchableOpacity style={styles.searchInput} activeOpacity={0.85} onPress={() => router.push('/search')}>
+            <Ionicons name="search-outline" size={18} color="#9E9E9E" />
+            <Text style={styles.searchPlaceholder}>Tìm điểm đến, quán mộc, bảo tàng...</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => { setSheetTab('category'); setSheetVisible(true); }}>
+            <Ionicons name="options-outline" size={18} color={colors.nomad.primary} />
           </TouchableOpacity>
         </View>
-
-        {/* Greeting + Sen */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroLeft}>
-            <Text style={styles.greeting}>{firstName} ơi!</Text>
-            <Text style={styles.tagline}>Hôm nay đi đâu?</Text>
-          </View>
-          <View style={styles.senContainer}>
-            <MascotBubble message={mascot.greeting} />
-            <MascotAvatar emotion={mascot.emotion} size={90} />
-          </View>
-        </View>
-
-        {/* Search bar */}
-        <TouchableOpacity style={styles.searchBar} activeOpacity={0.85} onPress={() => router.push('/search')}>
-          <Ionicons name="search-outline" size={18} color={colors.nomad.primary} />
-          <Text style={styles.searchPlaceholder}>Quán cà phê, bảo tàng, phố cổ...</Text>
-        </TouchableOpacity>
 
         {/* Category chips */}
         <ScrollView
@@ -422,32 +451,34 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 10,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoImg:    { width: 44, height: 44 },
-  headerIcon: { padding: 4 },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff' },
+  headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  logoImg:     { width: 38, height: 38 },
+  headerIcon:  { padding: 2 },
+  brandName:   { fontSize: 20, fontWeight: '700', color: colors.nomad.primary, lineHeight: 24 },
+  brandSub:    { fontSize: 11, color: '#8A8A8A' },
+  notifDot:    { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF4D6D', borderWidth: 1.5, borderColor: '#fff' },
 
-  // Greeting
-  heroSection:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
-  heroLeft:     { flex: 1 },
-  senContainer: { width: 100, alignItems: 'center', justifyContent: 'flex-end' },
-  greeting:    { fontSize: 28, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 36 },
-  tagline:     { fontSize: 28, fontWeight: '700', color: colors.nomad.primaryContainer, lineHeight: 36 },
+  // Hero card
+  greetingCard:    { marginHorizontal: 16, marginBottom: 12, borderRadius: 24, padding: 16, overflow: 'hidden', shadowColor: '#3a6010', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  heroDecorCircle: { position: 'absolute', bottom: -44, right: -44, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(160,210,100,0.22)' },
+  heroCardBody:    { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 },
+  heroCardLeft:    { flex: 1 },
+  heroBadge:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  heroDot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.nomad.primary },
+  heroLabelText:   { fontSize: 12, color: colors.nomad.primary, fontWeight: '500' },
+  greetingName:    { fontSize: 24, fontWeight: '800', color: '#1C1C1C', lineHeight: 30 },
+  greetingTagline: { fontSize: 24, fontWeight: '800', color: '#3E7B27', lineHeight: 30 },
+  senBubbleTail:   { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderBottomWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff', marginLeft: 14, alignSelf: 'flex-start' },
+  senBubble:       { backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 1 },
+  senBubbleText:   { fontSize: 13, color: '#3D3D3D', lineHeight: 18 },
 
   // Search
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: 20, marginBottom: 16,
-    backgroundColor: colors.nomad.surfaceContainerLow,
-    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,
-    shadowColor: colors.nomad.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.12, shadowRadius: 12, elevation: 2,
-  },
-  searchPlaceholder: { flex: 1, fontSize: 15, color: colors.nomad.outline },
+  searchBar:         { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 16, backgroundColor: '#fff', borderRadius: 28, height: 56, borderWidth: 1, borderColor: '#E5E5E5', paddingLeft: 16, paddingRight: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  searchInput:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, height: '100%' },
+  searchPlaceholder: { flex: 1, fontSize: 15, color: '#9E9E9E' },
+  filterBtn:         { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E3F0D6', alignItems: 'center', justifyContent: 'center' },
 
   // Category chips
   chipsScroll:            { marginBottom: 24 },

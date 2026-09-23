@@ -59,6 +59,19 @@ function getTimeSlot(hour: number): TimeSlot {
   return match?.slot ?? TIME_SLOTS[0].slot;
 }
 
+const SEN_MESSAGES = [
+  'Sen đã chuẩn bị 3 điểm đến cực mát mẻ cho bạn nè! ✨',
+  'Hôm nay trời đẹp, đi dạo đâu đó không bạn? 🌿',
+  'Có chỗ mới mẻ lắm, để Sen dẫn đường nhé! 🗺️',
+  'Cà phê xong rồi thì mình đi thôi nào~ ☕',
+  'Sen tìm được quán ăn ngon lắm, ghé thử nha! 🍜',
+  'Cuối tuần rồi, lên kế hoạch đi chơi chưa? 🎒',
+  'Một địa điểm mới đang chờ bạn khám phá đó! 🏮',
+  'Đi một mình hay rủ bạn bè cùng đi? Sen giúp lên lịch nha 🌸',
+  'Hôm nay Sen có gợi ý hay ho cho bạn đó, xem thử nào! 💡',
+  'Bước ra ngoài đi, thế giới rộng lớn lắm bạn ơi! 🌍',
+];
+
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -68,8 +81,9 @@ export function useMascot(overrideEmotion?: MascotEmotion): MascotState {
     const hour = new Date().getHours();
     const slot = getTimeSlot(hour);
     return {
-      emotion: overrideEmotion ?? slot.emotion,
-      greeting: pickRandom(slot.greetings),
+      emotion:    overrideEmotion ?? slot.emotion,
+      greeting:   pickRandom(slot.greetings),
+      senMessage: pickRandom(SEN_MESSAGES),
     };
   }, [overrideEmotion]);
 }
