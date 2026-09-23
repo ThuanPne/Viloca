@@ -132,12 +132,20 @@ export interface Location {
   short_description: string | null;
   photos: string | null;
   verified: boolean;
+  is_featured: boolean;
   // Admin / internal fields
   description: string | null;
   hint_generated_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  emoji: string | null;
+  sort_order: number;
 }
 
 export type BookmarkStatus = 'want' | 'planned' | 'done';
@@ -184,6 +192,7 @@ export interface Post {
   updated_at: string;
   profiles?: { full_name: string | null; avatar_url: string | null } | null;
   post_likes?: { user_id: string }[];
+  post_saves?: { user_id: string }[];
 }
 
 export interface PostComment {
