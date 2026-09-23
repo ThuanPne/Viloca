@@ -7,7 +7,7 @@ export const colors = {
   secondary400: '#72AA8A',
   secondary100: '#D8EDE3',
 
-  bgScreen:  '#FAF7F2',
+  bgScreen:  '#FAF7EE',
   bgCard:    '#FFFFFF',
   border:    '#EDE3D8',
 
@@ -37,7 +37,7 @@ export const colors = {
     secondaryContainer: '#daeb95',
     inverseSurface:   '#2f312b',
     inverseOnSurface: '#f1f1e7',
-    background:       '#FAF9F1',
+    background:       '#FAF7EE',
     onBackground:     '#1a1c17',
   },
 } as const;

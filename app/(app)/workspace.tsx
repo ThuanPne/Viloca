@@ -88,27 +88,21 @@ export default function WorkspaceScreen() {
     <ScreenWrapper>
       <View style={styles.header}>
         <View>
-          <Text style={styles.heading}>Trip Workspace</Text>
+          <Text style={styles.heading}>Chuyến đi</Text>
           <Text style={styles.subheading}>{trips.length} chuyến đi của bạn</Text>
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/create-trip')}>
-            <Ionicons name="sparkles-outline" size={16} color={N.primary} />
-            <Text style={styles.aiText}>AI Plan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/create-trip')}>
-            <Ionicons name="add" size={20} color={N.onPrimary} />
-            <Text style={styles.addText}>Trip mới</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/create-trip')}>
+          <Ionicons name="add" size={20} color={N.onPrimary} />
+          <Text style={styles.addText}>Lộ trình mới</Text>
+        </TouchableOpacity>
       </View>
 
       {trips.length === 0 ? (
         <EmptyState
           icon="map-outline"
           title="Chưa có chuyến đi nào"
-          body="Tạo trip đầu tiên để bắt đầu lên kế hoạch hành trình của bạn"
-          ctaLabel="Tạo Trip đầu tiên"
+          body="Tạo chuyến đi đầu tiên để bắt đầu lên kế hoạch hành trình của bạn"
+          ctaLabel="Hành trình đầu tiên"
           onCta={() => router.push('/create-trip')}
         />
       ) : (
@@ -177,9 +171,6 @@ const styles = StyleSheet.create({
   header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingTop: spacing.xl },
   heading:       { fontSize: 22, fontWeight: '800', color: N.onSurface },
   subheading:    { fontSize: 13, color: N.onSurfaceVariant, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aiBtn:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: N.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
-  aiText:        { color: N.primary, fontWeight: '600', fontSize: 14 },
   addBtn:        { flexDirection: 'row', alignItems: 'center', backgroundColor: N.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.xl, gap: 4 },
   addText:       { color: N.onPrimary, fontWeight: '600', fontSize: 14 },
 

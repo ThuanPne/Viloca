@@ -682,15 +682,22 @@ export default function TripDetailScreen() {
 
     if (fnErr || !plan?.days) {
       let detail = fnErr?.message ?? plan?.error ?? JSON.stringify(plan);
-      if (fnErr?.context) {
-        try { const b = await (fnErr.context as Response).json(); detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b); } catch {}
+      const httpStatus = (fnErr as any)?.context?.status;
+      let isOutOfCredits = httpStatus === 402 || plan?.error === 'No AI credits remaining';
+      if (!isOutOfCredits && fnErr?.context) {
+        try {
+          const b = await (fnErr.context as Response).json();
+          isOutOfCredits = b?.error === 'No AI credits remaining';
+          detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b);
+        } catch {}
       }
-      setAiLog(`✗ ${detail}`);
+      setAiLog(isOutOfCredits ? '⚠ Hết lượt giúp đỡ miễn phí. Nâng cấp Pro để tiếp tục.' : `✗ ${detail}`);
       setAiGenerating(false);
       return;
     }
 
-    setAiLog(`✓ AI đã lên ${plan.days.length} ngày, đang lưu...`);
+    const creditsMsg = plan.credits_remaining != null ? ` — còn ${plan.credits_remaining} lượt` : '';
+    setAiLog(`✓ AI đã lên ${plan.days.length} ngày, đang lưu...${creditsMsg}`);
     const slotMap: Record<string, 'morning' | 'afternoon' | 'evening'> = {
       'sáng': 'morning', 'chiều': 'afternoon', 'tối': 'evening',
     };

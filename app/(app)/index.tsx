@@ -415,9 +415,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 10,
-    backgroundColor: colors.nomad.background,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.nomad.outlineVariant,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   logoImg:    { width: 44, height: 44 },

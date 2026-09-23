@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   TextInput, ActivityIndicator, ScrollView, SafeAreaView, Modal, Image,
@@ -30,6 +30,11 @@ const PROVINCES = [
 ];
 
 const PRESET_VIBES = ['Bình yên', 'Cổ kính', 'Hoang sơ', 'Ẩm thực'];
+
+// Tỉnh/thành hiện có dữ liệu địa điểm — cập nhật khi thêm tỉnh mới vào DB
+const SUPPORTED_DESTINATIONS = new Set([
+  'Hà Nội', 'Đà Nẵng', 'TP. Hồ Chí Minh', 'Quảng Nam',
+]);
 
 const FIXED_GROUP_SIZE: Record<string, number> = { solo: 1, couple: 2 };
 
@@ -64,17 +69,21 @@ function getCoverImage(destination: string): string {
   return getCoverForDestination(destination, destination);
 }
 
-type Step = 1 | 'ai' | 'manual';
+type Step = 0 | 1 | 'ai' | 'manual';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CreateTripScreen() {
-  const [step, setStep]                 = useState<Step>(1);
+  const [step, setStep]                 = useState<Step>(0);
+  const [mode, setMode]                 = useState<'ai' | 'manual'>('ai');
+  const [userPlan, setUserPlan]         = useState<'free' | 'pro'>('free');
+  const [aiCredits, setAiCredits]       = useState(0);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [saving, setSaving]             = useState(false);
   const [aiLogs, setAiLogs]             = useState<{ msg: string; type: 'info' | 'ok' | 'err' | 'warn' }[]>([]);
   const [error, setError]               = useState('');
   const [cancelled, setCancelled]       = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const abortRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Step 1
@@ -99,8 +108,19 @@ export default function CreateTripScreen() {
   const [vibeInput, setVibeInput]         = useState('');
   const [showVibeInput, setShowVibeInput] = useState(false);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      supabase.from('profiles').select('plan, ai_credits_remaining').eq('id', session.user.id).single()
+        .then(({ data }) => {
+          if (data) { setUserPlan(data.plan ?? 'free'); setAiCredits(data.ai_credits_remaining ?? 0); }
+        });
+    });
+  }, []);
+
   function goBack() {
-    if (step === 1) router.back();
+    if (step === 0) router.back();
+    else if (step === 1) setStep(0);
     else setStep(1);
     setError('');
   }
@@ -174,6 +194,20 @@ export default function CreateTripScreen() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setError('Phiên đăng nhập hết hạn'); setAiGenerating(false); return; }
 
+    // Preflight: kiểm tra điểm đến có dữ liệu không trước khi tạo trip
+    const { count: destCount } = await supabase
+      .from('locations')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .ilike('address', `%${destination}%`);
+
+    if (!destCount || destCount === 0) {
+      setError(`"${destination}" chưa có dữ liệu địa điểm trên Viloca. Hiện hỗ trợ: Hà Nội, Đà Nẵng, TP. Hồ Chí Minh, Quảng Nam. Vui lòng chọn lại điểm đến.`);
+      setAiGenerating(false);
+      setStep(1);
+      return;
+    }
+
     log('Đang tạo chuyến đi...');
     const summaryParts = [
       travelingWith ? `Đi cùng: ${TRAVELING_WITH.find(x => x.value === travelingWith)?.label}` : null,
@@ -219,9 +253,38 @@ export default function CreateTripScreen() {
 
     if (fnErr || !plan?.days) {
       let detail = fnErr?.message ?? plan?.error ?? JSON.stringify(plan);
+      const httpStatus = (fnErr as any)?.context?.status;
+      let isOutOfCredits = httpStatus === 402 || plan?.error === 'No AI credits remaining';
+      let isNoLocations = false;
+      let noLocationsMessage = '';
+
       if (fnErr?.context) {
-        try { const b = await (fnErr.context as Response).json(); detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b); } catch {}
+        try {
+          const b = await (fnErr.context as Response).json();
+          if (!isOutOfCredits) isOutOfCredits = b?.error === 'No AI credits remaining';
+          if (b?.error === 'no_locations_for_destination') {
+            isNoLocations = true;
+            noLocationsMessage = b?.message ?? '';
+          }
+          detail = [b?.error, b?.detail].filter(Boolean).join(' — ') || JSON.stringify(b);
+        } catch {}
       }
+
+      if (isOutOfCredits) {
+        setShowCreditsModal(true);
+        setAiGenerating(false);
+        return;
+      }
+
+      if (isNoLocations || httpStatus === 404) {
+        // Xoá trip đã tạo vì không có địa điểm để lên lịch
+        await supabase.from('trips').delete().eq('id', trip.id);
+        setError(noLocationsMessage || `"${destination}" chưa có dữ liệu. Hiện hỗ trợ: Hà Nội, Đà Nẵng, TP. Hồ Chí Minh, Quảng Nam.`);
+        setAiGenerating(false);
+        setStep(1);
+        return;
+      }
+
       log(`✗ ${detail}`, 'err');
       setError('AI không thể tạo lịch trình. Thử lại hoặc tạo thủ công.');
       setAiGenerating(false);
@@ -230,6 +293,9 @@ export default function CreateTripScreen() {
 
     const totalSlots = (plan.days as { slots: unknown[] }[]).reduce((n, d) => n + d.slots.length, 0);
     log(`✓ AI đã lên ${plan.days.length} ngày với ${totalSlots} địa điểm`, 'ok');
+    if (plan.credits_remaining !== undefined && plan.credits_remaining !== null) {
+      log(`Còn ${plan.credits_remaining} lượt giúp đỡ miễn phí`, 'warn');
+    }
 
     log('Đang lưu lịch trình...');
     const slotMap: Record<string, 'morning' | 'afternoon' | 'evening'> = {
@@ -263,6 +329,63 @@ export default function CreateTripScreen() {
   function cancelAI() {
     setCancelled(true);
     if (abortRef.current) clearTimeout(abortRef.current);
+  }
+
+  // ── Step 0: Mode selection ──
+  if (step === 0) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerBack} onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={22} color={N.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Tạo lộ trình</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.modeScreen}>
+          <Text style={styles.modeHeading}>Bạn muốn lên lịch{'\n'}thế nào?</Text>
+
+          {/* Sen / AI card */}
+          <TouchableOpacity
+            style={[styles.modeCard, styles.modeCardAI]}
+            onPress={() => { setMode('ai'); setStep(1); }}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.modeCardIcon, styles.modeCardIconAI]}>
+              <Ionicons name="sparkles" size={26} color={N.primary} />
+            </View>
+            <View style={styles.modeCardBody}>
+              <Text style={styles.modeCardTitle}>Nhờ Sen lên kế hoạch</Text>
+              <Text style={styles.modeCardDesc}>Sen gợi ý lịch trình phù hợp dựa trên sở thích của bạn</Text>
+              {userPlan === 'free' && (
+                <View style={styles.modeCardBadge}>
+                  <Ionicons name="flash-outline" size={12} color={N.primary} />
+                  <Text style={styles.modeCardBadgeText}>{aiCredits} lượt giúp đỡ còn lại</Text>
+                </View>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={N.primary} />
+          </TouchableOpacity>
+
+          {/* Manual card */}
+          <TouchableOpacity
+            style={styles.modeCard}
+            onPress={() => { setMode('manual'); setStep(1); }}
+            activeOpacity={0.85}
+          >
+            <View style={styles.modeCardIcon}>
+              <Ionicons name="create-outline" size={26} color={N.onSurfaceVariant} />
+            </View>
+            <View style={styles.modeCardBody}>
+              <Text style={styles.modeCardTitle}>Tự lên lịch trình</Text>
+              <Text style={styles.modeCardDesc}>Tự chọn điểm đến, ngày đi và sắp xếp theo ý muốn</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={N.onSurfaceVariant} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   // ── AI Loading screen ──
@@ -404,11 +527,20 @@ export default function CreateTripScreen() {
               />
               <Text style={styles.inputHint}>Sử dụng tên dễ nhớ để tìm lại sau này.</Text>
 
-              {!!destination && (
+              {!!destination && SUPPORTED_DESTINATIONS.has(destination) && (
                 <View style={styles.tipCard}>
                   <Ionicons name="information-circle-outline" size={18} color={N.secondary} />
                   <Text style={styles.tipText}>
                     {destination} là điểm đến được yêu thích trên Viloca. Bạn đã sẵn sàng khám phá chưa?
+                  </Text>
+                </View>
+              )}
+              {!!destination && !SUPPORTED_DESTINATIONS.has(destination) && (
+                <View style={styles.tipCardWarn}>
+                  <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+                  <Text style={styles.tipTextWarn}>
+                    Viloca chưa có dữ liệu địa điểm tại {destination}. Tính năng AI Trip sẽ không khả dụng — bạn vẫn có thể tự lên lịch.{'\n'}
+                    <Text style={{ fontWeight: '600' }}>Hỗ trợ AI: Hà Nội, Đà Nẵng, TP. Hồ Chí Minh, Quảng Nam.</Text>
                   </Text>
                 </View>
               )}
@@ -606,11 +738,8 @@ export default function CreateTripScreen() {
       {/* Fixed bottom buttons */}
       {step === 1 && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={goAI} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>✨  Tạo lịch trình với AI</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={goManual} activeOpacity={0.85}>
-            <Text style={styles.secondaryBtnText}>✏  Tự lên lịch</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={mode === 'ai' ? goAI : goManual} activeOpacity={0.85}>
+            <Text style={styles.primaryBtnText}>Tiếp tục →</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -621,7 +750,7 @@ export default function CreateTripScreen() {
       )}
       {step === 'manual' && (
         <View style={styles.bottomBar}>
-          <Button label="Tạo Trip" onPress={createManual} loading={saving} />
+          <Button label="Tạo lộ trình" onPress={createManual} loading={saving} />
         </View>
       )}
 
@@ -672,6 +801,25 @@ export default function CreateTripScreen() {
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* ── Credits exhausted modal ───────────────────────────────────────────── */}
+      <Modal visible={showCreditsModal} transparent animationType="fade" onRequestClose={() => setShowCreditsModal(false)}>
+        <View style={styles.creditsOverlay}>
+          <View style={styles.creditsCard}>
+            <Ionicons name="sparkles" size={32} color={N.primary} style={{ marginBottom: 12 }} />
+            <Text style={styles.creditsTitle}>Hết lượt giúp đỡ</Text>
+            <Text style={styles.creditsBody}>
+              Bạn đã dùng hết số lượt giúp đỡ miễn phí. Nâng cấp lên Pro để tạo lịch trình không giới hạn và xem đầy đủ thông tin địa điểm.
+            </Text>
+            <TouchableOpacity style={styles.creditsUpgradeBtn} onPress={() => setShowCreditsModal(false)}>
+              <Text style={styles.creditsUpgradeBtnText}>Nâng cấp Pro →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowCreditsModal(false)} style={styles.creditsDismiss}>
+              <Text style={styles.creditsDismissText}>Để sau</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -710,8 +858,10 @@ const styles = StyleSheet.create({
   pickerRowText:        { fontSize: 16, fontWeight: '700', color: N.primary, flex: 1 },
   pickerRowPlaceholder: { fontSize: 16, color: N.onSurfaceVariant, flex: 1 },
 
-  tipCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: N.secondaryContainer + '30', borderRadius: radius.lg, borderWidth: 1, borderColor: N.secondaryContainer + '50', padding: spacing.md, marginTop: spacing.lg },
-  tipText: { flex: 1, fontSize: 12, color: N.onSurface, lineHeight: 18 },
+  tipCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: N.secondaryContainer + '30', borderRadius: radius.lg, borderWidth: 1, borderColor: N.secondaryContainer + '50', padding: spacing.md, marginTop: spacing.lg },
+  tipText:     { flex: 1, fontSize: 12, color: N.onSurface, lineHeight: 18 },
+  tipCardWarn: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.error + '12', borderRadius: radius.lg, borderWidth: 1, borderColor: colors.error + '40', padding: spacing.md, marginTop: spacing.lg },
+  tipTextWarn: { flex: 1, fontSize: 12, color: colors.error, lineHeight: 18 },
 
   sectionTitle: { fontSize: 15, fontWeight: '700', color: N.onSurface, marginBottom: spacing.sm },
   sectionLabel: { fontSize: 13, fontWeight: '600', color: N.onSurfaceVariant, marginBottom: 8 },
@@ -762,6 +912,18 @@ const styles = StyleSheet.create({
   secondaryBtn:     { height: 54, borderRadius: radius.xl, borderWidth: 1.5, borderColor: N.primary, alignItems: 'center', justifyContent: 'center' },
   secondaryBtnText: { fontSize: 16, fontWeight: '700', color: N.primary },
 
+  modeScreen:         { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  modeHeading:        { fontSize: 28, fontWeight: '800', color: N.onSurface, letterSpacing: -0.5, marginBottom: spacing.xl, lineHeight: 36 },
+  modeCard:           { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: N.surfaceContainerLow, borderRadius: radius.xl, borderWidth: 1.5, borderColor: N.outlineVariant, padding: spacing.md, marginBottom: spacing.md },
+  modeCardAI:         { borderColor: N.primary, backgroundColor: N.secondaryContainer + '30' },
+  modeCardIcon:       { width: 52, height: 52, borderRadius: 14, backgroundColor: N.surfaceContainer, alignItems: 'center', justifyContent: 'center' },
+  modeCardIconAI:     { backgroundColor: N.secondaryContainer },
+  modeCardBody:       { flex: 1, gap: 4 },
+  modeCardTitle:      { fontSize: 15, fontWeight: '700', color: N.onSurface },
+  modeCardDesc:       { fontSize: 12, color: N.onSurfaceVariant, lineHeight: 17 },
+  modeCardBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, backgroundColor: N.secondaryContainer, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  modeCardBadgeText:  { fontSize: 11, fontWeight: '700', color: N.primary },
+
   overlay:                { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   provinceModal:          { backgroundColor: N.surfaceContainerLow, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%' },
   modalHandle:            { width: 40, height: 4, borderRadius: 2, backgroundColor: N.outlineVariant, alignSelf: 'center', marginTop: 10, marginBottom: spacing.md },
@@ -787,4 +949,13 @@ const styles = StyleSheet.create({
   logLine:                  { flex: 1, fontSize: 13, color: N.onSurface, lineHeight: 19 },
   cancelBtn:                { paddingVertical: 16, paddingHorizontal: 40 },
   cancelBtnText:            { fontSize: 14, fontWeight: '600', color: N.onSurfaceVariant },
+
+  creditsOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  creditsCard:         { backgroundColor: N.surfaceContainerLow, borderRadius: 24, padding: 28, alignItems: 'center', width: '100%', maxWidth: 340 },
+  creditsTitle:        { fontSize: 20, fontWeight: '800', color: N.onSurface, marginBottom: 10, textAlign: 'center' },
+  creditsBody:         { fontSize: 14, color: N.onSurfaceVariant, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
+  creditsUpgradeBtn:   { width: '100%', backgroundColor: N.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  creditsUpgradeBtnText: { fontSize: 15, fontWeight: '700', color: N.onPrimary },
+  creditsDismiss:      { paddingVertical: 10 },
+  creditsDismissText:  { fontSize: 14, color: N.onSurfaceVariant },
 });
