@@ -2,15 +2,7 @@ export type MascotEmotion =
   | 'idle'
   | 'happy'
   | 'excited'
-  | 'thinking'
-  | 'surprised'
-  | 'love'
-  | 'winking'
-  | 'walking'
-  | 'exploring'
-  | 'celebrating'
-  | 'talking'
-  | 'sleeping';
+  | 'exploring';
 
 export interface MascotState {
   emotion: MascotEmotion;

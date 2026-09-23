@@ -9,6 +9,9 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/src/theme/colors';
+import { useMascot } from '@/hooks/useMascot';
+import MascotAvatar from '@/components/Mascot/MascotAvatar';
+import MascotBubble from '@/components/Mascot/MascotBubble';
 import { useFestivals } from '@/src/hooks/useFestivals';
 import { useLocations } from '@/src/hooks/useLocations';
 import { FilterSheet, FilterTab } from '@/src/components/home/FilterSheet';
@@ -186,6 +189,7 @@ export default function HomeScreen() {
   const insets    = useSafeAreaInsets();
   const user      = useAuthStore((s) => s.user);
   const firstName = user?.user_metadata?.full_name?.split(' ').pop() ?? 'bạn';
+  const mascot = useMascot();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sheetVisible, setSheetVisible]     = useState(false);
@@ -256,10 +260,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Greeting */}
+        {/* Greeting + Sen */}
         <View style={styles.heroSection}>
-          <Text style={styles.greeting}>{firstName} ơi!</Text>
-          <Text style={styles.tagline}>Hôm nay đi đâu?</Text>
+          <View style={styles.heroLeft}>
+            <Text style={styles.greeting}>{firstName} ơi!</Text>
+            <Text style={styles.tagline}>Hôm nay đi đâu?</Text>
+          </View>
+          <View style={styles.senContainer}>
+            <MascotBubble message={mascot.greeting} />
+            <MascotAvatar emotion={mascot.emotion} size={90} />
+          </View>
         </View>
 
         {/* Search bar */}
@@ -421,7 +431,9 @@ const styles = StyleSheet.create({
   headerIcon: { padding: 4 },
 
   // Greeting
-  heroSection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  heroSection:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  heroLeft:     { flex: 1 },
+  senContainer: { width: 100, alignItems: 'center', justifyContent: 'flex-end' },
   greeting:    { fontSize: 28, fontWeight: '700', color: colors.nomad.onSurface, lineHeight: 36 },
   tagline:     { fontSize: 28, fontWeight: '700', color: colors.nomad.primaryContainer, lineHeight: 36 },
 

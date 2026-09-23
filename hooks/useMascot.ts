@@ -32,7 +32,7 @@ const TIME_SLOTS: { start: number; end: number; slot: TimeSlot }[] = [
   {
     start: 18, end: 21,
     slot: {
-      emotion: 'love',
+      emotion: 'happy',
       greetings: [
         'Tối rồi, tìm chỗ ăn ngon thôi! 🍜',
         'Tối nay thử món mới nhé? Sen biết chỗ ngon lắm! 🌙',
