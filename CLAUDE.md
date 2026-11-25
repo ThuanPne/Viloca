@@ -39,7 +39,7 @@ npx supabase db reset # re-applies all migrations + supabase/seed.sql from scrat
 npx supabase stop     # shuts the local stack down
 ```
 
-This project's `supabase/config.toml` overrides the default CLI ports (API/Kong `55321`, DB `55322`, Studio `55323`, Inbucket `55324`) instead of the standard `54321-54324` — `npx supabase start` prints the actual URLs, but don't assume the defaults when constructing a URL by hand (e.g. in a migration or script). Local Studio UI: http://127.0.0.1:55323. Local test accounts and their seed configuration are kept outside Git. On a physical device via Expo Go, `127.0.0.1` in `.env.local` won't reach the host machine — swap it for the machine's LAN IP.
+`supabase/config.toml` is **tracked in Git** (not gitignored) specifically so every machine gets the same local ports — it overrides the default CLI ports to API/Kong `55321`, DB `55322`, Studio `55323`, Inbucket `55324` instead of the standard `54321-54324`. `npx supabase start` prints the actual URLs, but don't assume the standard `5432x` defaults when constructing a URL by hand (e.g. in a migration or script) — a hardcoded `127.0.0.1:54321` in a migration once broke image loading because it silently pointed at a port nothing was listening on. Local Studio UI: http://127.0.0.1:55323. Don't re-add `config.toml` to `.gitignore`; it holds no secrets (every sensitive field uses `env(VAR_NAME)` substitution). Local test accounts and their seed configuration are kept outside Git. On a physical device via Expo Go, `127.0.0.1` in `.env.local` won't reach the host machine — swap it for the machine's LAN IP.
 
 To point the app at production temporarily, copy `.env.production.local`'s values into `.env.local` (or swap the files) and restart the dev server.
 
