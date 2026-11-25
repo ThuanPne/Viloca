@@ -56,7 +56,6 @@ supabase/backups/
 # Local test accounts and seed configuration (never publish)
 /supabase/seed.sql
 /supabase/seeds/friend-test-users.sql
-/supabase/config.toml
 /docs/TEST_KET_BAN.md
 
 # Python cache
