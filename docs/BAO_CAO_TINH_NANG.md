@@ -1,40 +1,37 @@
-# Báo Cáo Tính Năng Ứng Dụng Viloca
+# Tính Năng Ứng Dụng Viloca
 
----
+## Tài khoản
+- Đăng ký / đăng nhập / xác thực email — tạo tài khoản và xác minh email bằng mã OTP
+- Onboarding — chọn độ tuổi và sở thích du lịch ngay từ lần dùng đầu để cá nhân hoá gợi ý
 
-## 1. Discovery — Khám phá
+## Khám phá
+- Trang chủ gợi ý địa điểm — đề xuất địa điểm nổi bật, "dành cho bạn" ngay khi mở app
+- Địa điểm gần bạn 
+- Lễ hội / sự kiện 
+- Chi tiết địa điểm — ảnh, mô tả, giờ mở cửa, giá, chỉ đường tới nơi
+- Tìm kiếm & bộ lọc 
+- Song ngữ Việt/Anh 
+- Trải nghiệm địa phương 
 
-- **Trang chủ**: gợi ý địa điểm nổi bật, lễ hội sắp diễn ra, lọc theo sở thích
-- **Lễ hội / sự kiện**: đếm ngược ngày diễn ra các sự kiện sắp đến
-- **Tìm kiếm**: tìm theo tên, lọc theo thành phố, thêm nhanh vào lịch trình
-- **Chi tiết địa điểm**: ảnh, mô tả, giờ mở cửa, giá, liên hệ, lưu yêu thích, chỉ đường
+## Chuyến đi
+- Tạo chuyến đi thủ công — tự chọn địa điểm, sắp xếp lịch trình
+- Lên lịch trình bằng AI
+- Quản lý chuyến đi 
+- Bản đồ chỉ đường & tính tuyến 
+- Bản đồ offline 
+- Gợi ý theo thời tiết 
+- Danh sách đồ mang theo 
 
----
+## Gamification
+- Check-in & điểm danh hằng ngày — điểm danh mỗi ngày, giữ chuỗi liên tiếp để nhận thưởng
+- Nhiệm vụ & phần thưởng — hoàn thành nhiệm vụ để nhận thưởng trong app
+- Bảng xếp hạng
 
-## 2. Trip Creation — Tạo chuyến đi
+## Cộng đồng
+- Đăng bài chia sẻ chuyến đi 
+- Thích / bình luận / lưu bài 
+- Hồ sơ cá nhân
+- Theo dõi / kết bạn
 
-- **2 cách tạo**: thủ công hoặc bằng AI
-- **Cá nhân hoá**: đi cùng ai, phong cách, ngân sách, lưu trú, phương tiện
-- **Ước tính chi phí**: cập nhật tức thời theo lựa chọn
-- **Theo dõi AI real-time**: xem từng bước xử lý, có thể huỷ giữa chừng
-- **Quản lý chuyến đi**: trạng thái rõ ràng, nhãn riêng cho chuyến do AI tạo
-
----
-
-## 3. AI Engine — Cách AI lên lịch trình
-
-- Chỉ cần nhập: điểm đến, số ngày, ngân sách, phong cách
-- Tự chọn địa điểm phù hợp ngân sách & sở thích
-- Sắp xếp thông minh theo ngày/buổi, tối ưu di chuyển
-- Kèm lý do gợi ý cho từng địa điểm
-- Đối chiếu dữ liệu thật, đảm bảo chính xác
-
----
-
-## 4. Trip Map — Bản đồ chuyến đi
-
-- **Bản đồ nền**: Leaflet + OpenStreetMap
-- **Markers**: điểm đến và vị trí người dùng
-- **Routing**: tính tuyến đường bằng OSRM
-- **Live location**: cập nhật vị trí, khoảng cách theo thời gian thực
-- **Định vị nền**: gợi ý địa điểm gần khi dừng chân đủ lâu
+## Gói dịch vụ
+- Free / Pro — Pro xem được đầy đủ thông tin địa điểm (địa chỉ, toạ độ, SĐT, giờ mở cửa), Free chỉ xem thông tin cơ bản
